@@ -57,11 +57,12 @@
         // Überschreibt die intere IPS_ApplyChanges($id) Funktion
         public function ApplyChanges() {
             // Diese Zeile nicht löschen
-            parent::ApplyChanges();
+            IPS_SetProperty($this->InstanceID, "ToggleScriptID", 99);
+			
+			parent::ApplyChanges();
 			//Instanz ist aktiv
 			$this->SetStatus(102);
 			
-			IPS_SetProperty($this->InstanceID, "ToggleScriptID", 99);
 			//IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
 			
         }
