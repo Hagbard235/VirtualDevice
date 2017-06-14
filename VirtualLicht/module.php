@@ -19,6 +19,7 @@
             parent::Create();
             
 			$this->RegisterPropertyInteger("PropertyInstanceID",0); 
+			$this->RegisterPropertyInteger("ToggleScriptID",0); 
 			
 			//Variablenprofil anlegen ($name, $ProfileType, $Suffix, $MinValue, $MaxValue, $StepSize, $Digits, $Icon)
 		$profilename = "VIR.Licht";
@@ -59,6 +60,9 @@
             parent::ApplyChanges();
 			//Instanz ist aktiv
 			$this->SetStatus(102);
+			$togglescript = $this->ReadPropertyString("ToggleScriptID");
+			IPS_SetProperty($this->InstanceID, "ToggleScriptID", 99);
+			IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
 			
         }
  
