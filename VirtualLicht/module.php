@@ -1,5 +1,5 @@
 <?
-     include("php_gardena_mover_class.ips.php");
+     
     // Klassendefinition
     class VirtualLicht extends IPSModule {
 
@@ -18,6 +18,8 @@
             // Diese Zeile nicht löschen.
             parent::Create();
             
+			$this->RegisterPropertyInteger("PropertyInstanceID",0); 
+			
 			//Variablenprofil anlegen ($name, $ProfileType, $Suffix, $MinValue, $MaxValue, $StepSize, $Digits, $Icon)
 		$profilename = "VIR.Licht";
 		if (!IPS_VariableProfileExists($profilename)) {
