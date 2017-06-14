@@ -1,0 +1,14 @@
+{
+    "id": "{2df00fd9-a978-4611-b476-e90315fdb259}",
+    "name": "VirtualLicht",
+    "type": 3,
+    "vendor": "VirtualLicht",
+    "aliases":
+    [
+        "VirtualLicht"
+    ],  
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "VIR"
+}

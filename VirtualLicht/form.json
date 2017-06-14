@@ -1,0 +1,24 @@
+{
+    "elements":
+    [
+        { "type": "ValidationTextBox", "name": "Username", "caption": "Username" },
+        { "type": "ValidationTextBox", "name": "Password", "caption": "Password" },
+		{ "type": "Label", "label": "Refresh-Zeit für Status in Minuten" },
+        { "type": "IntervalBox", "name": "Interval", "caption": "Minuten" },
+		{ "type": "Label", "label": "Refresh-Zeit für Batterie in Minuten" },
+        { "type": "IntervalBox", "name": "IntervalB", "caption": "Minuten" },
+		{ "type": "Label", "label": "Refresh-Zeit für Funkstatus in Minuten (0=Aus)" },
+        { "type": "IntervalBox", "name": "IntervalF", "caption": "Minuten" }
+        
+    ],
+   // "actions":
+    //[
+    //    { "type": "Button", "label": "Verbindung testen", "onClick": "GAR_CheckUsernameUndPassword($_IPS[\'TARGET\']);" }
+    //],
+    "status":
+    [
+        { "code": 102, "icon": "active", "caption": "Login information valid" },
+        { "code": 201, "icon": "error", "caption": "Authentication failed" },
+        { "code": 202, "icon": "error", "caption": "No credits left" }
+    ]
+}
