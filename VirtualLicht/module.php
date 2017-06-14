@@ -60,7 +60,7 @@
             parent::ApplyChanges();
 			//Instanz ist aktiv
 			$this->SetStatus(102);
-			$togglescript = $this->ReadPropertyString("ToggleScriptID");
+			
 			IPS_SetProperty($this->InstanceID, "ToggleScriptID", 99);
 			//IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
 			
