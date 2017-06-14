@@ -1,7 +1,7 @@
 {
     "elements":
     [
-	    { "type": "SelectInstance", "name": "PropertyInstanceID", "caption": "Ziel" }
+	    { "type": "SelectInstance", "name": "PropertyInstanceID", "caption": "Ziel" },
 		{ "type": "NumberSpinner", "name": "ToggleScriptID", "caption": "ToggleScriptID" }
         
     ],
