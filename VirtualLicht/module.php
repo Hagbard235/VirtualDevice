@@ -31,7 +31,7 @@
 			IPS_SetVariableProfileAssociation($profilename, 1, "gedimmt", "", 0xFFFF00);
 			
 		}
-				$proberty_name = "action";
+				$proberty_name = "Status";
 				$varID = @$this->GetIDForIdent($proberty_name);
 				if (IPS_VariableExists($varID)) {
 					
@@ -39,7 +39,7 @@
 
 				}
 				else {
-				$VarID_NEU = $this->RegisterVariableInteger($proberty_name,"Aktion","VIR.Licht",0);
+				$VarID_NEU = $this->RegisterVariableInteger($proberty_name,"Status","VIR.Licht",0);
 				$this->EnableAction($proberty_name);
 		
 				
