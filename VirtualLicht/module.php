@@ -24,11 +24,11 @@
 			//Variablenprofil anlegen ($name, $ProfileType, $Suffix, $MinValue, $MaxValue, $StepSize, $Digits, $Icon)
 		$profilename = "VIR.Licht";
 		if (!IPS_VariableProfileExists($profilename)) {
-			IPS_CreateVariableProfile($profilename, 1);
+			IPS_CreateVariableProfile($profilename, 0);
 			IPS_SetVariableProfileIcon($profilename, "Bulb");
-			IPS_SetVariableProfileAssociation($profilename, 0, "an", "", 0xFFFF00);
-			IPS_SetVariableProfileAssociation($profilename, 99, "aus", "", 0xFFFF00);
-			IPS_SetVariableProfileAssociation($profilename, 1, "gedimmt", "", 0xFFFF00);
+			IPS_SetVariableProfileAssociation($profilename, true, "an", "", 0xFFFF00);
+			IPS_SetVariableProfileAssociation($profilename, false, "aus", "", 0xFFFFFF);
+			//IPS_SetVariableProfileAssociation($profilename, 1, "gedimmt", "", 0xFFFF00);
 			
 		}
 				$proberty_name = "Status";
@@ -39,7 +39,7 @@
 
 				}
 				else {
-				$VarID_NEU = $this->RegisterVariableInteger($proberty_name,"Status","VIR.Licht",0);
+				$VarID_NEU = $this->RegisterVariableBoolean($proberty_name,"Status","VIR.Licht",0);
 				$this->EnableAction($proberty_name);
 		
 				
