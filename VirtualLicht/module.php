@@ -20,6 +20,12 @@
             
 			$this->RegisterPropertyInteger("PropertyInstanceID",0); 
 			$this->RegisterPropertyInteger("ToggleScriptID",0); 
+			$doThis = 'VIR_LichtUmschalten($_IPS[\'TARGET\']);';
+			$this->RegisterTimer("Umschalten", 0, $doThis );
+			$doThis = 'VIR_LichtAnschalten($_IPS[\'TARGET\']);';
+			$this->RegisterTimer("Umschalten", 0, $doThis );
+			$doThis = 'VIR_LichtAusschalten($_IPS[\'TARGET\']);';
+			$this->RegisterTimer("Umschalten", 0, $doThis );
 			
 			//Variablenprofil anlegen ($name, $ProfileType, $Suffix, $MinValue, $MaxValue, $StepSize, $Digits, $Icon)
 		$profilename = "VIR.Licht";
