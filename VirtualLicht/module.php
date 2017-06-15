@@ -475,6 +475,6 @@
 		$this->SetTimerInterval("Ausschalten", 14000);
 		//return false;
 		}	} // IPS_LichtAus
-
+	}
     
 ?>
