@@ -96,7 +96,7 @@
 			$this->SetTimerInterval("Umschalten", 0);
 			// Vergleichen und ggf. Fehlermeldung oder nochmal versuchen
 
-			$statusvar = GetIDForIdent("Status");
+			$statusvar = $this->GetIDForIdent("Status");
 			if (IPS_VariableExists($statusvar)) {
 				
 			
@@ -121,7 +121,7 @@
 				// Differenz entedeckt!
 ////TODO anderen Variablen-Typ wählen
 
-				$CountVar = GetIDForIdent("Count");
+				$CountVar = $this->GetIDForIdent("Count");
 				
 				if ($CountVar === false)
 					{
@@ -140,7 +140,7 @@
 					$Scriptname = "Toggle";
 					$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
 					$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
-					$statusvar = GetIDForIdent("Status");
+					$statusvar = $this->GetIDForIdent("Status");
 					if ($statusvar === false)
 						{
 				//		sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -177,7 +177,7 @@
 
 				// Keine Differenz (mehr) entdeckt, mögliche Variable löschen
 
-				$CountVar = GetIDForIdent("Count");
+				$CountVar = $this->GetIDForIdent("Count");
 				if ($CountVar === false)
 					{
 
@@ -195,7 +195,7 @@
 			$Scriptname = "Toggle";
 			$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
 			$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
-			$statusvar = GetIDForIdent("Status");
+			$statusvar = $this->GetIDForIdent("Status");
 			if ($statusvar === false)
 				{
 		//		sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -233,7 +233,7 @@
 
 		// Vergleichen und ggf. Fehlermeldung oder nochmal versuchen
 
-		$statusvar = GetIDForIdent("Status");
+		$statusvar = $this->GetIDForIdent("Status");
 		if ($statusvar === false)
 			{
 		//	sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -253,7 +253,7 @@
 
 			// Differenz entedeckt!
 
-			$CountVar = GetIDForIdent("Count");
+			$CountVar = $this->GetIDForIdent("Count");
 			if ($CountVar === false)
 				{
 
@@ -269,7 +269,7 @@
 				$Scriptname = "An_Force";
 				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
-				$statusvar = GetIDForIdent("Status");
+				$statusvar = $this->GetIDForIdent("Status");
 				if ($statusvar === false)
 					{
 				//	sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -307,7 +307,7 @@
 
 			// Keine Differenz (mehr) entdeckt, mögliche Variable löschen
 
-			$CountVar = GetIDForIdent("Count");
+			$CountVar = $this->GetIDForIdent("Count");
 			if ($CountVar === false)
 				{
 
@@ -325,7 +325,7 @@
 		$Scriptname = "An";
 		$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 		$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
-		$statusvar = GetIDForIdent("Status");
+		$statusvar = $this->GetIDForIdent("Status");
 		if ($statusvar === false)
 			{
 		//	sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -361,7 +361,7 @@
 
 		// Vergleichen und ggf. Fehlermeldung oder nochmal versuchen
 
-		$statusvar = GetIDForIdent("Status");
+		$statusvar = $this->GetIDForIdent("Status");
 		if ($statusvar === false)
 			{
 		//	sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -381,7 +381,7 @@
 
 			// Differenz entedeckt!
 
-			$CountVar = GetIDForIdent("Count");
+			$CountVar = $this->GetIDForIdent("Count");
 			if ($CountVar === false)
 				{
 
@@ -397,7 +397,7 @@
 				$Scriptname = "Aus_Force";
 				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
-				$statusvar = GetIDForIdent("Status");
+				$statusvar = $this->GetIDForIdent("Status");
 				if ($statusvar === false)
 					{
 				//	sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
@@ -435,7 +435,7 @@
 
 			// Keine Differenz (mehr) entdeckt, mögliche Variable löschen
 
-			$CountVar = GetIDForIdent("Count");
+			$CountVar = $this->GetIDForIdent("Count");
 			if ($CountVar === false)
 				{
 
@@ -453,7 +453,7 @@
 		$Scriptname = "Aus";
 		$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 		$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
-		$statusvar = GetIDForIdent("Status");
+		$statusvar = $this->GetIDForIdent("Status");
 		if ($statusvar === false)
 			{
 		//	sendDBMessage('ERROR', 'In ' . $_IPS['SELF'] . ' wurde die Statusvariable nicht gefunden', '', 0);
