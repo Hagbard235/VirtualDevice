@@ -107,7 +107,7 @@
 				
 				
 				}
-			$O_ID = $this->ReadPropertyString("PropertyInstanceID");
+			$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
 			$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
 			if ($hw_statusvar === false)
 				{
@@ -138,7 +138,7 @@
 					// 2. Versuch starten
 
 					$Scriptname = "Toggle";
-					$O_ID = $this->ReadPropertyString("PropertyInstanceID");
+					$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
 					$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
 					$statusvar = GetIDForIdent("Status");
 					if ($statusvar === false)
@@ -193,7 +193,7 @@
 		  else
 			{
 			$Scriptname = "Toggle";
-			$O_ID = $this->ReadPropertyString("PropertyInstanceID");
+			$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
 			$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
 			$statusvar = GetIDForIdent("Status");
 			if ($statusvar === false)
@@ -240,7 +240,7 @@
 		//	return false;
 			}
 
-		$O_ID =  $this->ReadPropertyString("PropertyInstanceID");
+		$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 		$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
 		if ($hw_statusvar === false)
 			{
@@ -267,7 +267,7 @@
 				// 2. Schaltversuch
 
 				$Scriptname = "An_Force";
-				$O_ID =  $this->ReadPropertyString("PropertyInstanceID");
+				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
 				$statusvar = GetIDForIdent("Status");
 				if ($statusvar === false)
@@ -323,7 +323,7 @@
 	  else
 		{
 		$Scriptname = "An";
-		$O_ID =  $this->ReadPropertyString("PropertyInstanceID");
+		$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 		$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
 		$statusvar = GetIDForIdent("Status");
 		if ($statusvar === false)
@@ -368,7 +368,7 @@
 		//	return false;
 			}
 
-		$O_ID =  $this->ReadPropertyString("PropertyInstanceID");
+		$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 		$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
 		if ($hw_statusvar === false)
 			{
@@ -395,7 +395,7 @@
 				// 2. Schaltversuch
 
 				$Scriptname = "Aus_Force";
-				$O_ID =  $this->ReadPropertyString("PropertyInstanceID");
+				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
 				$statusvar = GetIDForIdent("Status");
 				if ($statusvar === false)
@@ -451,7 +451,7 @@
 	  else
 		{
 		$Scriptname = "Aus";
-		$O_ID =  $this->ReadPropertyString("PropertyInstanceID");
+		$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 		$scriptAn = @IPS_GetObjectIDByName($Scriptname, $O_ID);
 		$statusvar = GetIDForIdent("Status");
 		if ($statusvar === false)
