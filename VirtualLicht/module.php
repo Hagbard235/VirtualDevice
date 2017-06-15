@@ -469,7 +469,7 @@
 		if (IPS_ScriptExists($scriptAn))
 			{
 			@IPS_RunScript($scriptAn);
-			SetValueBoolean($statusvar, true);
+			SetValueBoolean($statusvar, false);
 			}
 		  else
 			{
