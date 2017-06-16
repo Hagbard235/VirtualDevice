@@ -2,17 +2,23 @@
     "elements":
     [
 	    { "type": "SelectInstance", "name": "PropertyInstanceID", "caption": "Ziel" },
-		{ "type": "NumberSpinner", "name": "ToggleScriptID", "caption": "ToggleScriptID" }
+		{ "type": "Label", "label": "TimeOut-Zeit für das Überprüfen des Schaltvorgang" },
+		{ "type": "NumberSpinner","caption": "TimeOut", "name": "TimeOut" }
+
         
     ],
    // "actions":
     //[
-    //    { "type": "Button", "label": "Verbindung testen", "onClick": "GAR_CheckUsernameUndPassword($_IPS[\'TARGET\']);" }
+    //    { "type": "Button", "label": "Verbndung testen", "onClick": "GAR_CheckUsernameUndPassword($_IPS[\'TARGET\']);" }
     //],
     "status":
     [
-        { "code": 102, "icon": "active", "caption": "Login information valid" },
-        { "code": 201, "icon": "error", "caption": "Authentication failed" },
-        { "code": 202, "icon": "error", "caption": "No credits left" }
+        { "code": 102, "icon": "active", "caption": "Alle Daten OK" },
+        { "code": 201, "icon": "error", "caption": "Status-Variable fehlt in Ziel-Instanz" },
+        { "code": 202, "icon": "error", "caption": "An-Script fehlt in Ziel-Instanz" },
+		{ "code": 203, "icon": "error", "caption": "Aus-Script fehlt in Ziel-Instanz" },
+		{ "code": 204, "icon": "error", "caption": "An_Force-Script fehlt in Ziel-Instanz" },
+		{ "code": 205, "icon": "error", "caption": "Aus_Force-Script fehlt in Ziel-Instanz" },
+		{ "code": 206, "icon": "error", "caption": "Toggle-Script fehlt in Ziel-Instanz" }
     ]
 }
