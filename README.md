@@ -49,9 +49,9 @@ Wenn jetzt die Hardware-Instanz *04 kaputt geht und durch einen neuen Aktor ausg
  Alle haben die selben Profile und Funktionen und können so einfacher in der Visualisierung also z.B. im Webfront verwendet werden.
  
  Verwendung der virtuellen Instanzen:
- - Kompatibiliätsscripte und/oder Variablen anlegen (siehe Readme der Instanz)
- - Neue Instanz anlegen vom gewünschten Typ
- - Ziel-Instanz wählen (die originale Instanz)
- - ggf. Instanz-abhängige Konfiguration vornehmen (siehe Readme der Instanz)
- - ggf. existierende Verweise in Scripten, Events oder Links auf die virtuelle Instanz abhändern
- - "Hardare-Instanz" vergessen und nur noch mit der virtuellen Instanz weiter arbeiten
+1. - Kompatibiliätsscripte und/oder Variablen anlegen (siehe Readme der Instanz)
+1. - Neue Instanz anlegen vom gewünschten Typ
+1. - Ziel-Instanz wählen (die originale Instanz)
+1. - ggf. Instanz-abhängige Konfiguration vornehmen (siehe Readme der Instanz)
+1. - ggf. existierende Verweise in Scripten, Events oder Links auf die virtuelle Instanz abhändern
+1.  - "Hardare-Instanz" vergessen und nur noch mit der virtuellen Instanz weiter arbeiten
