@@ -68,6 +68,16 @@
 			//Instanz ist aktiv
 			$this->SetStatus(102);
 			
+			if ($this->ReadPropertyInteger("PropertyInstanceID" != 0)  {
+				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
+				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
+				$eid = IPS_CreateEvent(0);                  //Ausgelöstes Ereignis
+				IPS_SetEventTrigger($eid, 1, 15754);        //Bei Änderung von Variable mit ID 15754
+				IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
+				IPS_SetParent($eid, $this->InstanceID);         //Ereignis zuordnen
+				IPS_SetEventActive($eid, true);             //Ereignis aktivieren
+			}
+			
 			//IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
 			
         }
@@ -79,6 +89,15 @@
         * ABC_MeineErsteEigeneFunktion($id);
         *
         */
+		public function Statusaktualisieren() {
+			$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
+				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
+				$statusvar = $this->GetIDForIdent("Status");
+				SetValueBoolean($statusvar, GetValueBoolean($hw_statusvar));
+				
+			
+		}
+			
         public function LichtUmschalten() {
             if (($_IPS['SENDER'] == 'WebFront') or ($_IPS['SENDER'] == "AlexaSmartHome"))
 		{
