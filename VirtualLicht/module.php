@@ -68,7 +68,7 @@
 			//Instanz ist aktiv
 			$this->SetStatus(102);
 			
-			if ($this->ReadPropertyInteger("PropertyInstanceID" != 0)  {
+			if ($this->ReadPropertyInteger("PropertyInstanceID" != 0))  {
 				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
 				$eid = IPS_CreateEvent(0);                  //Ausgelöstes Ereignis
