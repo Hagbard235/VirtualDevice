@@ -72,7 +72,7 @@
 				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
 				$eid = IPS_CreateEvent(0);                  //Ausgelöstes Ereignis
-				IPS_SetEventTrigger($eid, 1, 15754);        //Bei Änderung von Variable mit ID 15754
+				IPS_SetEventTrigger($eid, 1, $hw_statusvar);        //Bei Änderung von Variable mit ID 15754
 				IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
 				IPS_SetParent($eid, $this->InstanceID);         //Ereignis zuordnen
 				IPS_SetEventActive($eid, true);             //Ereignis aktivieren
