@@ -69,6 +69,10 @@
 			$this->SetStatus(102);
 			
 			if ($this->ReadPropertyInteger("PropertyInstanceID") != 0)  {
+				$alt_event = @IPS_GetObjectIDByName("aktualisieren", $this->InstanceID);
+				IPS_DeleteEvent($alt_event);
+				
+				
 				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
 				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
 				$eid = IPS_CreateEvent(0);                  //Ausgelöstes Ereignis
@@ -76,6 +80,7 @@
 				IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
 				IPS_SetParent($eid, $this->InstanceID);         //Ereignis zuordnen
 				IPS_SetEventActive($eid, true);             //Ereignis aktivieren
+				IPS_SetName($eid, "aktualisieren");
 			}
 			
 			//IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
