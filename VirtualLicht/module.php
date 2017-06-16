@@ -229,6 +229,10 @@ class VirtualLicht extends IPSModule
     }
     public function LichtUmschalten()
     {
+		$this->SetTimerInterval("Anschalten", 0);
+		$this->SetTimerInterval("Ausschalten", 0);
+		$this->SetTimerInterval("Umschalten", 0);
+		
         if (($_IPS['SENDER'] == 'WebFront') or ($_IPS['SENDER'] == "AlexaSmartHome")) {
             if ($_IPS['VALUE'] === true) {
                 LichtAnschalten();
@@ -355,6 +359,10 @@ class VirtualLicht extends IPSModule
     }
     public function LichtAnschalten()
     {
+		$this->SetTimerInterval("Anschalten", 0);
+		$this->SetTimerInterval("Ausschalten", 0);
+		$this->SetTimerInterval("Umschalten", 0);
+		
         if ($_IPS['SENDER'] == "TimerEvent") {
             
             // Timer ausschalten
@@ -465,6 +473,10 @@ class VirtualLicht extends IPSModule
     
     function LichtAusschalten()
     {
+		$this->SetTimerInterval("Anschalten", 0);
+		$this->SetTimerInterval("Ausschalten", 0);
+		$this->SetTimerInterval("Umschalten", 0);
+		
         if ($_IPS['SENDER'] == "TimerEvent") {
             
             // Timer ausschalten
