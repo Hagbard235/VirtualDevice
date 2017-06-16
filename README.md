@@ -32,14 +32,14 @@ Diese empfiehlt es sich nach dem Einsatz zu sortieren, z.B. so:
 
 
 * *01-IP-Symcon
- * *02--Hardware <- "echte" Instanzen mit der Hardware
-  * *03---Unterverteilung HWR
-   * *04----Deckenlicht Wohnzimmer <- z.B. Eltako-Aktor
+	* *02--Hardware <- "echte" Instanzen mit der Hardware
+		* *03---Unterverteilung HWR
+			* *04----Deckenlicht Wohnzimmer <- z.B. Eltako-Aktor
 * ............
- * *13-- Geräte <- virtuelle Instanzen
-  * *14--- Erdgeschoss
-   * *15---- Wohnzimmer
-    * *16----- Deckenlicht <- dies ist dann die virtuelle Instanz mit Link auf *04
+	* *13-- Geräte <- virtuelle Instanzen
+		* *14--- Erdgeschoss
+			* *15---- Wohnzimmer
+				* *16----- Deckenlicht <- dies ist dann die virtuelle Instanz mit Link auf *04
 
 Wenn jetzt die Hardware-Instanz *04 kaputt geht und durch einen neuen Aktor ausgetauscht der die IPS-ID *05 bekommt,
  wird nur in der virtuellen Instanz *16 der Link auf *04 gegen *05 ausgetauscht und alle anderen Scripte und Events können so weiter 
