@@ -70,7 +70,9 @@
 			
 			if ($this->ReadPropertyInteger("PropertyInstanceID") != 0)  {
 				$alt_event = @IPS_GetObjectIDByName("aktualisieren", $this->InstanceID);
+				if ($alt_event > 0) {
 				IPS_DeleteEvent($alt_event);
+				}
 				
 				
 				$O_ID =  $this->ReadPropertyInteger("PropertyInstanceID");
