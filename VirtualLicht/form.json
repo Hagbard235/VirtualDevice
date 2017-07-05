@@ -3,7 +3,9 @@
     [
 	    { "type": "SelectInstance", "name": "PropertyInstanceID", "caption": "Ziel" },
 		{ "type": "Label", "label": "TimeOut-Zeit für das Überprüfen des Schaltvorgang" },
-		{ "type": "NumberSpinner","caption": "TimeOut", "name": "TimeOut" }
+		{ "type": "NumberSpinner","caption": "TimeOut", "name": "TimeOut" },
+		{ "type": "CheckBox", "name": "Dimmbar", "caption": "Dimmbar" },
+		{ "type": "Button","label": "Umschalten Dimmbar","onClick": "VIR_leseGeraet($id); "}
 
         
     ],
@@ -19,6 +21,7 @@
 		{ "code": 203, "icon": "error", "caption": "Aus-Script fehlt in Ziel-Instanz" },
 		{ "code": 204, "icon": "error", "caption": "An_Force-Script fehlt in Ziel-Instanz" },
 		{ "code": 205, "icon": "error", "caption": "Aus_Force-Script fehlt in Ziel-Instanz" },
-		{ "code": 206, "icon": "error", "caption": "Toggle-Script fehlt in Ziel-Instanz" }
+		{ "code": 206, "icon": "error", "caption": "Toggle-Script fehlt in Ziel-Instanz" },
+		{ "code": 207, "icon": "error", "caption": "Instanz nicht eingelesen, Button drücken" }
     ]
 }

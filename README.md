@@ -1,6 +1,6 @@
 # VirtualDevice
 
-Die Bibliothek VirtualDevice unterstütz die virtualisierung von Hardware-Geräten in den Bereichen Licht, Steckdose und Rollo
+Die Bibliothek VirtualDevice unterstützt die virtualisierung von Hardware-Geräten in den Bereichen Licht, Steckdose und Rollo
 
 Ziel ist es eine Kapselung von den echten Hardware-Instanzen im IP Symcon zu schaffen und damit
 - bei Hardware-Wechsel die Änderungen an zentraler Steller vorzunehmen

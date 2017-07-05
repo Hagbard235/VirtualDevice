@@ -22,7 +22,10 @@ class VirtualLicht extends IPSModule
         parent::Create();
         
         $this->RegisterPropertyInteger("PropertyInstanceID", 0);
+        /* $this->RegisterPropertyInteger("PropertyInstanceIDgelesen", -1); */
         $this->RegisterPropertyInteger("TimeOut", 5);
+        $this->RegisterPropertyBoolean("Dimmbar", false);
+		
         
         $this->RegisterPropertyInteger("ToggleScriptID", 0);
         $doThis = 'VIR_LichtUmschalten($_IPS[\'TARGET\']);';
@@ -69,6 +72,10 @@ class VirtualLicht extends IPSModule
             
             
         }
+  // Beispiel für das 'endlos'-Applychanges
+        $this->SetBuffer('Apply', '0');
+    
+		
         
         
         
@@ -98,101 +105,146 @@ class VirtualLicht extends IPSModule
         
         parent::ApplyChanges();
         //Instanz ist aktiv
-        $this->SetStatus(102);
-        
-        if ($this->ReadPropertyInteger("PropertyInstanceID") != 0) {
-            
-            //Prüfen ob Instanz alle notwendigen Elemente hat
-            $O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
-            
-            //Status-Variable
-            $hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
-            if ($hw_statusvar == false) {
-                $this->SetStatus(201);
-                echo ("Status-Variable nicht gefunden");
-                IPS_LogMessage($this->InstanceID, "Variable Status nicht gefunden");
-            }
-            //An-Script
-            $hw_an = @IPS_GetObjectIDByName("An", $O_ID);
-            if ($hw_an == false) {
-                $this->SetStatus(202);
-                echo ("An-Script nicht gefunden");
-                IPS_LogMessage($this->InstanceID, "Script An nicht gefunden");
-            }
-            //Aus-Script
-            $hw_aus = @IPS_GetObjectIDByName("Aus", $O_ID);
-            if ($hw_aus == false) {
-                $this->SetStatus(203);
-                echo ("Aus-Script nicht gefunden");
-                IPS_LogMessage($this->InstanceID, "Script Aus nicht gefunden");
-            }
-            //An_Force-Script
-            $hw_an_force = @IPS_GetObjectIDByName("An_Force", $O_ID);
-            if ($hw_an_force == false) {
-                $this->SetStatus(204);
-                echo ("An_Force-Script nicht gefunden");
-                IPS_LogMessage($this->InstanceID, "Script An_Force nicht gefunden");
-            }
-            //Aus_Force-Script
-            $hw_aus_force = @IPS_GetObjectIDByName("Aus_Force", $O_ID);
-            if ($hw_aus_force == false) {
-                $this->SetStatus(205);
-                echo ("Aus_Force-Script nicht gefunden");
-                IPS_LogMessage($this->InstanceID, "Script Aus_Force nicht gefunden");
-            }
-            //Toggle-Script
-            $hw_toggle = @IPS_GetObjectIDByName("Toggle", $O_ID);
-            if ($hw_toggle == false) {
-                $this->SetStatus(206);
-                echo ("Toggle-Script nicht gefunden");
-                IPS_LogMessage($this->InstanceID, "Script Toggle nicht gefunden");
-            }
-            //Dimm-Script
-            $hw_dimm = @IPS_GetObjectIDByName("Dimmen", $O_ID);
-            if ($hw_dimm == true) {
-                $varID = @$this->GetIDForIdent("Dimmen");
-                if (IPS_VariableExists($varID)) {
-                    
-                    
-                    
-                } else {
-                    $VarID_NEU = $this->RegisterVariableInteger("Dimmen", "Dimmer", "VIR.Dimmer", 0);
-                    $this->EnableAction("Dimmen");
-                }
-                
-            }
-            
-            //Altes Event löschen vor Neuanlage
-            $alt_event = @IPS_GetObjectIDByName("aktualisieren", $this->InstanceID);
-            if ($alt_event > 0) {
-                IPS_DeleteEvent($alt_event);
-            }
+        $apply = $this->GetBuffer('Apply');
+		if ($apply == 0 ) {
+			$this->SetStatus(102);
 			
-			$alt_eventd = @IPS_GetObjectIDByName("aktdimmer", $this->InstanceID);
-            if ($alt_eventd > 0) {
-                IPS_DeleteEvent($alt_eventd);
-            }
-            
-            //Neues Event anlegen
-            $O_ID         = $this->ReadPropertyInteger("PropertyInstanceID");
-            $hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
-            $eid          = IPS_CreateEvent(0); //Ausgelöstes Ereignis
-            IPS_SetEventTrigger($eid, 1, $hw_statusvar); //Bei Änderung von Variable mit ID 15754
-            IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
-            IPS_SetParent($eid, $this->InstanceID); //Ereignis zuordnen
-            IPS_SetEventActive($eid, true); //Ereignis aktivieren
-            IPS_SetName($eid, "aktualisieren");
-			
-			 //Neues Eventfür Dimmer anlegen
-            $O_ID         = $this->ReadPropertyInteger("PropertyInstanceID");
-            $hw_dimvar = @IPS_GetObjectIDByName("Intensity", $O_ID);
-            $eid          = IPS_CreateEvent(0); //Ausgelöstes Ereignis
-            IPS_SetEventTrigger($eid, 1, $hw_dimvar); //Bei Änderung von Variable mit ID 15754
-            IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
-            IPS_SetParent($eid, $this->InstanceID); //Ereignis zuordnen
-            IPS_SetEventActive($eid, true); //Ereignis aktivieren
-            IPS_SetName($eid, "aktdimmer");
-        }
+			if ($this->ReadPropertyInteger("PropertyInstanceID") != 0) {
+				
+				//Prüfen ob Instanz alle notwendigen Elemente hat
+				$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
+				
+				//Status-Variable
+				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
+				if ($hw_statusvar == false) {
+					$this->SetStatus(201);
+					echo ("Status-Variable nicht gefunden");
+					IPS_LogMessage($this->InstanceID, "Variable Status nicht gefunden");
+				}
+				//An-Script
+				$hw_an = @IPS_GetObjectIDByName("An", $O_ID);
+				if ($hw_an == false) {
+					$this->SetStatus(202);
+					echo ("An-Script nicht gefunden");
+					IPS_LogMessage($this->InstanceID, "Script An nicht gefunden");
+				}
+				//Aus-Script
+				$hw_aus = @IPS_GetObjectIDByName("Aus", $O_ID);
+				if ($hw_aus == false) {
+					$this->SetStatus(203);
+					echo ("Aus-Script nicht gefunden");
+					IPS_LogMessage($this->InstanceID, "Script Aus nicht gefunden");
+				}
+				//An_Force-Script
+				$hw_an_force = @IPS_GetObjectIDByName("An_Force", $O_ID);
+				if ($hw_an_force == false) {
+					$this->SetStatus(204);
+					echo ("An_Force-Script nicht gefunden");
+					IPS_LogMessage($this->InstanceID, "Script An_Force nicht gefunden");
+				}
+				//Aus_Force-Script
+				$hw_aus_force = @IPS_GetObjectIDByName("Aus_Force", $O_ID);
+				if ($hw_aus_force == false) {
+					$this->SetStatus(205);
+					echo ("Aus_Force-Script nicht gefunden");
+					IPS_LogMessage($this->InstanceID, "Script Aus_Force nicht gefunden");
+				}
+				//Toggle-Script
+				$hw_toggle = @IPS_GetObjectIDByName("Toggle", $O_ID);
+				if ($hw_toggle == false) {
+					$this->SetStatus(206);
+					echo ("Toggle-Script nicht gefunden");
+					IPS_LogMessage($this->InstanceID, "Script Toggle nicht gefunden");
+				}
+				/* Instanz eingelesen?
+				// $O2_ID = $this->ReadPropertyInteger("PropertyInstanceIDgelesen");
+				// if ($O_ID != $O2_ID) {
+					// $this->SetStatus(207);
+				   echo ("Instanz nicht eingelesen");
+					// IPS_LogMessage($this->InstanceID, "Instanz muss erst eingelesen werden");
+				// } */
+
+
+				//Dimm-Script
+				$hw_dimm = @IPS_GetObjectIDByName("Dimmen", $O_ID);
+				if ($hw_dimm != false) {
+					
+					$varID = @$this->GetIDForIdent("Dimmen");
+					if (IPS_VariableExists($varID)) {
+						
+						
+						
+					} else {
+						$VarID_NEU = $this->RegisterVariableInteger("Dimmen", "Dimmer", "VIR.Dimmer", 0);
+						$this->EnableAction("Dimmen");
+					}
+					
+				}
+				
+				//Altes Event löschen vor Neuanlage
+				$alt_event = @IPS_GetObjectIDByName("aktualisieren", $this->InstanceID);
+				if ($alt_event > 0) {
+					IPS_DeleteEvent($alt_event);
+				}
+				
+				$alt_eventd = @IPS_GetObjectIDByName("aktdimmer", $this->InstanceID);
+				if ($alt_eventd > 0) {
+					IPS_DeleteEvent($alt_eventd);
+				}
+				
+				//Neues Event anlegen
+				$O_ID         = $this->ReadPropertyInteger("PropertyInstanceID");
+				$hw_statusvar = @IPS_GetObjectIDByName("Status", $O_ID);
+				$eid          = IPS_CreateEvent(0); //Ausgelöstes Ereignis
+				IPS_SetEventTrigger($eid, 1, $hw_statusvar); //Bei Änderung von Variable mit ID 15754
+				IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
+				IPS_SetParent($eid, $this->InstanceID); //Ereignis zuordnen
+				IPS_SetEventActive($eid, true); //Ereignis aktivieren
+				IPS_SetName($eid, "aktualisieren");
+
+				$O_ID = $this->ReadPropertyInteger("PropertyInstanceID");
+					if ($O_ID != 0) {
+					 /* IPS_SetProperty($this->InstanceID, 'PropertyInstanceIDgelesen', $O_ID); */
+						$hw_dimm = @IPS_GetObjectIDByName("Dimmen", $O_ID);
+						if ($hw_dimm == false) {
+						IPS_SetProperty($this->InstanceID, 'Dimmbar', false);	
+						} else {
+						IPS_SetProperty($this->InstanceID, 'Dimmbar', true);	
+						}
+					 $this->SetBuffer('Apply', 1);
+					 
+					 
+				}
+				
+				 //Neues Eventfür Dimmer anlegen
+				if (@IPS_VariableExists(IPS_GetObjectIDByName("Intensity", $O_ID))) {
+					$O_ID         = $this->ReadPropertyInteger("PropertyInstanceID");
+					$hw_dimvar = @IPS_GetObjectIDByName("Intensity", $O_ID);
+					$eid          = IPS_CreateEvent(0); //Ausgelöstes Ereignis
+					IPS_SetEventTrigger($eid, 1, $hw_dimvar); //Bei Änderung von Variable mit ID 15754
+					IPS_SetEventScript($eid, "VIR_Statusaktualisieren($this->InstanceID);");
+					IPS_SetParent($eid, $this->InstanceID); //Ereignis zuordnen
+					IPS_SetEventActive($eid, true); //Ereignis aktivieren
+					IPS_SetName($eid, "aktdimmer");
+				}
+
+				$dimmvalue = $this->GetIDForIdent("Dimmen");
+				if (!$hw_dimm==false ){
+				IPS_SetHidden($dimmvalue, false);
+
+				} else {
+				
+				IPS_SetHidden($dimmvalue, true);
+				
+				}
+			}
+			IPS_ApplyChanges($this->InstanceID);
+
+        } else {
+			//tue nix, weil er hier nur durch läuft wegen dem unnötigen ApplyChanges
+			// nur Puffer zurücksetzen
+			$this->SetBuffer('Apply',0);
+			}
         
         //IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
         
@@ -205,6 +257,17 @@ class VirtualLicht extends IPSModule
      * ABC_MeineErsteEigeneFunktion($id);
      *
      */
+	public function leseGeraet() {
+    
+		$hw_dimm = @IPS_GetObjectIDByName("Dimmen", $O_ID);
+		
+		IPS_SetProperty($this->InstanceID, 'Dimmbar', !$this->ReadPropertyBoolean("Dimmbar"));	
+		
+	 
+	 IPS_ApplyChanges($this->InstanceID);
+	
+
+	}
     public function Statusaktualisieren()
     {
         $O_ID         = $this->ReadPropertyInteger("PropertyInstanceID");
