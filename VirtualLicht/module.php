@@ -20,7 +20,7 @@ class VirtualLicht extends IPSModule
     {
         // Diese Zeile nicht löschen.
         parent::Create();
-        
+        $this->SendDebug("Create23", "Create23", 0);
         $this->RegisterPropertyInteger("PropertyInstanceID", 0);
         /* $this->RegisterPropertyInteger("PropertyInstanceIDgelesen", -1); */
         $this->RegisterPropertyInteger("TimeOut", 5);
@@ -34,7 +34,7 @@ class VirtualLicht extends IPSModule
         $this->RegisterTimer("Anschalten", 0, $doThis);
         $doThis = 'VIR_LichtAusschalten($_IPS[\'TARGET\']);';
         $this->RegisterTimer("Ausschalten", 0, $doThis);
-        
+        $this->SendDebug("Create37", "Create37", 0);
         //Variablenprofil anlegen ($name, $ProfileType, $Suffix, $MinValue, $MaxValue, $StepSize, $Digits, $Icon)
         $profilename = "VIR.Licht";
 		if (IPS_VariableProfileExists($profilename)) {
@@ -59,21 +59,25 @@ class VirtualLicht extends IPSModule
 			IPS_SetVariableProfileText ($profilename, "", " %");
             
         }
+		$this->SendDebug("Create62", "Create62", 0);
         $proberty_name = "Status";
         $varID         = @$this->GetIDForIdent($proberty_name);
         if (IPS_VariableExists($varID)) {
             
             
-            
+            $this->SendDebug("Create68", "Create68", 0);
         } else {
+			$this->SendDebug("Create70", "Create70", 0);
             $VarID_NEU = $this->RegisterVariableBoolean($proberty_name, "Status", "VIR.Licht", 0);
             $this->EnableAction($proberty_name);
+			
             
             
             
         }
   // Beispiel für das 'endlos'-Applychanges
         $this->SetBuffer('Apply', '0');
+		$this->SendDebug("Create80", "Create80", 0);
     
 		
         
@@ -83,6 +87,7 @@ class VirtualLicht extends IPSModule
     
     public function RequestAction($Ident, $Value)
     {
+		$this->SendDebug("RequestactionStart", "RequestactionStart", 0);
 		if ($Ident == "Dimmen") {
 			$this->LichtDimmen($Value);
 			
@@ -102,7 +107,7 @@ class VirtualLicht extends IPSModule
     public function ApplyChanges()
     {
         // Diese Zeile nicht löschen
-        
+        $this->SendDebug("ApplyChanges", "ApplyChanges", 0);
         parent::ApplyChanges();
         //Instanz ist aktiv
         $apply = $this->GetBuffer('Apply');
@@ -212,6 +217,7 @@ class VirtualLicht extends IPSModule
 						IPS_SetProperty($this->InstanceID, 'Dimmbar', true);	
 						}
 					 $this->SetBuffer('Apply', 1);
+					 $apply == 1 ;
 					 
 					 
 				}
@@ -237,16 +243,20 @@ class VirtualLicht extends IPSModule
 				IPS_SetHidden($dimmvalue, true);
 				
 				}
+			
 			}
-			IPS_ApplyChanges($this->InstanceID);
-
-        } else {
+			
+			if ($apply == 1 ) {
+				IPS_ApplyChanges($this->InstanceID);
+			}
+	
+	} else {
 			//tue nix, weil er hier nur durch läuft wegen dem unnötigen ApplyChanges
 			// nur Puffer zurücksetzen
 			$this->SetBuffer('Apply',0);
 			}
         
-        //IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen
+        //IPS_ApplyChanges($this->InstanceID); //Neue Konfiguration übernehmen DAS MUSSTE RAUS
         
     }
     
@@ -648,6 +658,28 @@ class VirtualLicht extends IPSModule
             //return false;
         }
     } // IPS_LichtAus
+	protected function SendDebug($Message, $Data, $Format)
+		{
+			if (is_array($Data))
+			{
+			    foreach ($Data as $Key => $DebugData)
+			    {
+						$this->SendDebug($Message . ":" . $Key, $DebugData, 0);
+			    }
+			}
+			else if (is_object($Data))
+			{
+			    foreach ($Data as $Key => $DebugData)
+			    {
+						$this->SendDebug($Message . "." . $Key, $DebugData, 0);
+			    }
+			}
+			else
+			{
+			    parent::SendDebug($Message, $Data, $Format);
+				IPS_LogMessage($Message, $Data);
+			}
+		} 
 }
 
 ?>
