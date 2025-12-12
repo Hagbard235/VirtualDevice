@@ -1,0 +1,11 @@
+{
+  "id": "{A1B2C3D4-E5F6-7890-1234-56789ABCDEF0}",
+  "name": "BewegungsmelderProxy",
+  "type": 3,
+  "vendor": "Custom",
+  "aliases": ["Motion Proxy", "Lichtsteuerung"],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "BWMProxy"
+}
