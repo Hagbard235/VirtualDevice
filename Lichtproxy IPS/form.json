@@ -1,0 +1,53 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Hardware Verknüpfungen"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "TargetLightID",
+      "caption": "Ziel: Licht (Schalter/Variable)",
+      "width": "600px"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "SourceMotionID",
+      "caption": "Quelle: Bewegung (Variable)",
+      "width": "600px"
+    },
+    {
+      "type": "Label",
+      "caption": "Helligkeitssteuerung (Priorität: Extern > Intern)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "SourceBrightnessID",
+      "caption": "Intern: Helligkeitswert (Lux)",
+      "width": "400px"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Threshold",
+      "caption": "Schaltschwelle (Lux)",
+      "suffix": "Lux"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "SourceIsDarkID",
+      "caption": "Extern: 'Ist Dunkel' (Boolean override)",
+      "width": "600px"
+    },
+    {
+      "type": "Label",
+      "caption": "Zeiten"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Duration",
+      "caption": "Einschaltdauer",
+      "suffix": "Sekunden",
+      "minimum": 0
+    }
+  ]
+}
