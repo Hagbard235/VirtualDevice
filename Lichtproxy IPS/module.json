@@ -1,6 +1,6 @@
 {
   "id": "{A1B2C3D4-E5F6-7890-1234-56789ABCDEF0}",
-  "name": "Bewegungsmelder (Proxy)",
+  "name": "Bewegungsmelder-Proxy",
   "type": 3,
   "vendor": "Custom",
   "aliases": ["Motion Proxy", "Lichtsteuerung"],
@@ -8,4 +8,5 @@
   "childRequirements": [],
   "implemented": [],
   "prefix": "BWM"
+
 }
