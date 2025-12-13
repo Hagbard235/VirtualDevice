@@ -11,7 +11,7 @@ class BewegungsmelderProxy extends IPSModule {
     public function Create() {
         parent::Create();
 
-        // 1. Properties
+        // 1. Properties registrieren
         $this->RegisterPropertyInteger("ButtonTopID", 0);
         $this->RegisterPropertyInteger("ButtonBottomID", 0);
         
@@ -22,10 +22,10 @@ class BewegungsmelderProxy extends IPSModule {
         $this->RegisterPropertyInteger("Threshold", 120);
         $this->RegisterPropertyInteger("Duration", 300);
 
-        // 2. Attribute
+        // 2. Attribute (Interner Speicher für den "letzten Modus")
         $this->RegisterAttributeInteger("SavedMode", self::MODE_AUTO_LUX);
 
-        // 3. Profil
+        // 3. Profil erstellen
         if (!IPS_VariableProfileExists("BWM.Mode")) {
             IPS_CreateVariableProfile("BWM.Mode", 1);
             IPS_SetVariableProfileAssociation("BWM.Mode", 0, "Auto (Lux)", "Motion", -1);
@@ -35,17 +35,17 @@ class BewegungsmelderProxy extends IPSModule {
             IPS_SetVariableProfileIcon("BWM.Mode", "Gear");
         }
 
-        // 4. Variablen
+        // 4. Status-Variablen registrieren
         $this->RegisterVariableBoolean("Status", "Licht Status", "~Switch", 10);
         $this->RegisterVariableBoolean("Motion", "Bewegung", "~Motion", 20);
         $this->RegisterVariableInteger("Brightness", "Helligkeit", "~Illumination", 30);
         $this->RegisterVariableInteger("Mode", "Modus", "BWM.Mode", 0);
 
-        // 5. Aktionen
+        // 5. Aktionen aktivieren
         $this->EnableAction("Status");
         $this->EnableAction("Mode");
 
-        // 6. Timer
+        // 6. Timer registrieren
         $this->RegisterTimer("AutoOffTimer", 0, 'BWMProxy_TimerEvent($_IPS[\'TARGET\']);');
     }
 
@@ -60,7 +60,8 @@ class BewegungsmelderProxy extends IPSModule {
         $btnTopID = $this->ReadPropertyInteger("ButtonTopID");
         $btnBottomID = $this->ReadPropertyInteger("ButtonBottomID");
 
-        // Registrierungen
+        // Messages registrieren
+        // Wir nutzen VM_UPDATE, damit auch Taster erkannt werden, die ihren Wert nur aktualisieren (Timestamp), aber nicht ändern.
         if ($motionID > 0) $this->RegisterMessage($motionID, VM_UPDATE);
         if ($lightID > 0) $this->RegisterMessage($lightID, VM_UPDATE);
         if ($luxID > 0) $this->RegisterMessage($luxID, VM_UPDATE);
@@ -68,7 +69,7 @@ class BewegungsmelderProxy extends IPSModule {
         if ($btnTopID > 0) $this->RegisterMessage($btnTopID, VM_UPDATE);
         if ($btnBottomID > 0) $this->RegisterMessage($btnBottomID, VM_UPDATE);
 
-        // --- NEU: Helper Scripte anlegen ---
+        // Helper Scripte (An/Aus) anlegen oder aktualisieren
         $this->CreateHelperScripts();
     }
 
@@ -82,7 +83,10 @@ class BewegungsmelderProxy extends IPSModule {
         
         $value = $Data[0];
 
-        // TASTER
+        // --- TASTER LOGIK ---
+        
+        // Taste OBEN: Modus auf "Dauer Ein"
+        // Check auf $value === true, um sicherzugehen, dass es ein "Drücken" ist (und kein Loslassen bei Toggles)
         if ($SenderID == $btnTopID && $value === true) {
             $currentMode = $this->GetValue("Mode");
             if ($currentMode != self::MODE_ALWAYS_ON) {
@@ -92,16 +96,21 @@ class BewegungsmelderProxy extends IPSModule {
             return;
         }
 
+        // Taste UNTEN: Zurück zum alten Modus
         if ($SenderID == $btnBottomID && $value === true) {
             $savedMode = $this->ReadAttributeInteger("SavedMode");
+            
+            // Fallback, falls SavedMode ungültig oder unlogisch wäre
             if ($savedMode == self::MODE_ALWAYS_ON) {
                 $savedMode = self::MODE_AUTO_LUX;
             }
+            
             $this->ChangeMode($savedMode);
             return;
         }
 
-        // STANDARD
+        // --- STANDARD LOGIK ---
+
         if ($SenderID == $motionID) {
             $this->SetValue("Motion", $value);
             if ($value === true) {
@@ -125,16 +134,29 @@ class BewegungsmelderProxy extends IPSModule {
         }
     }
 
+    /**
+     * Öffentliche Funktion: Kann von Scripten direkt aufgerufen werden.
+     * Befehl: BWMProxy_SetLight(InstanceID, true|false);
+     */
+    public function SetLight(bool $State) {
+        $this->SwitchLight($State);
+    }
+
     private function ChangeMode($newMode) {
         $this->SetValue("Mode", $newMode);
         
+        // Sofortige Reaktion auf Moduswechsel
         if ($newMode == self::MODE_ALWAYS_ON) {
             $this->SwitchLight(true);
-            $this->SetTimerInterval("AutoOffTimer", 0);
+            $this->SetTimerInterval("AutoOffTimer", 0); // Timer aus
+            
         } elseif ($newMode == self::MODE_ALWAYS_OFF) {
             $this->SwitchLight(false);
             $this->SetTimerInterval("AutoOffTimer", 0);
+            
         } elseif ($newMode == self::MODE_AUTO_LUX || $newMode == self::MODE_AUTO_NOLUX) {
+            // Beim Wechsel zurück auf Automatik prüfen wir die aktuelle Lage.
+            // Wenn keine Bewegung mehr da ist -> Aus.
             if (!$this->GetValue("Motion")) {
                  $this->SwitchLight(false);
             } else {
@@ -170,17 +192,21 @@ class BewegungsmelderProxy extends IPSModule {
     }
 
     private function IsDarkEnough() {
+        // 1. Priorität: Externe Variable
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         if ($extDarkID > 0 && IPS_VariableExists($extDarkID)) {
             return GetValueBoolean($extDarkID);
         }
 
+        // 2. Priorität: Interne Helligkeit vs Threshold
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         if ($luxID > 0 && IPS_VariableExists($luxID)) {
             $lux = GetValue($luxID);
             $threshold = $this->ReadPropertyInteger("Threshold");
             return ($lux <= $threshold);
         }
+
+        // Fallback: Immer dunkel annehmen
         return true; 
     }
 
@@ -194,43 +220,48 @@ class BewegungsmelderProxy extends IPSModule {
 
     public function TimerEvent() {
         $mode = $this->GetValue("Mode");
+        // Nur ausschalten, wenn wir im Auto-Modus sind
         if ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX) {
             $this->SwitchLight(false);
         }
         $this->SetTimerInterval("AutoOffTimer", 0);
     }
 
-    // --- NEUE HILFSFUNKTION FÜR SCRIPTE ---
     private function CreateHelperScripts() {
-        // Script "An"
+        // 1. Script "An"
         $sidAn = @IPS_GetObjectIDByIdent("ScriptAn", $this->InstanceID);
         if ($sidAn === false) {
             $sidAn = IPS_CreateScript(0);
             IPS_SetParent($sidAn, $this->InstanceID);
             IPS_SetIdent($sidAn, "ScriptAn");
             IPS_SetName($sidAn, "An");
-            IPS_SetHidden($sidAn, true); // Auf false setzen, wenn du sie sehen willst
+            IPS_SetHidden($sidAn, true); 
             IPS_SetPosition($sidAn, 100);
-            
-            // Inhalt: Ruft RequestAction auf Parent auf
-            $content = "<?php\nRequestAction(IPS_GetParent(\$_IPS['SELF']), 'Status', true);\n?>";
-            IPS_SetScriptContent($sidAn, $content);
         }
+        
+        // Inhalt: Direkter Aufruf der Public Function
+        $contentAn = "<?php\n" .
+                     "BWMProxy_SetLight(IPS_GetParent(\$_IPS['SELF']), true);\n" .
+                     "?>";
+        IPS_SetScriptContent($sidAn, $contentAn);
 
-        // Script "Aus"
+
+        // 2. Script "Aus"
         $sidAus = @IPS_GetObjectIDByIdent("ScriptAus", $this->InstanceID);
         if ($sidAus === false) {
             $sidAus = IPS_CreateScript(0);
             IPS_SetParent($sidAus, $this->InstanceID);
             IPS_SetIdent($sidAus, "ScriptAus");
             IPS_SetName($sidAus, "Aus");
-            IPS_SetHidden($sidAus, true); // Auf false setzen, wenn du sie sehen willst
+            IPS_SetHidden($sidAus, true);
             IPS_SetPosition($sidAus, 101);
-
-            // Inhalt: Ruft RequestAction auf Parent auf
-            $content = "<?php\nRequestAction(IPS_GetParent(\$_IPS['SELF']), 'Status', false);\n?>";
-            IPS_SetScriptContent($sidAus, $content);
         }
+
+        // Inhalt: Direkter Aufruf der Public Function
+        $contentAus = "<?php\n" .
+                      "BWMProxy_SetLight(IPS_GetParent(\$_IPS['SELF']), false);\n" .
+                      "?>";
+        IPS_SetScriptContent($sidAus, $contentAus);
     }
 }
 ?>
