@@ -11,7 +11,7 @@ class BewegungsmelderProxy extends IPSModule {
     public function Create() {
         parent::Create();
 
-        // 1. Properties registrieren
+        // 1. Properties
         $this->RegisterPropertyInteger("ButtonTopID", 0);
         $this->RegisterPropertyInteger("ButtonBottomID", 0);
         
@@ -22,10 +22,10 @@ class BewegungsmelderProxy extends IPSModule {
         $this->RegisterPropertyInteger("Threshold", 120);
         $this->RegisterPropertyInteger("Duration", 300);
 
-        // 2. Attribute (Interner Speicher für den "letzten Modus")
+        // 2. Attribute
         $this->RegisterAttributeInteger("SavedMode", self::MODE_AUTO_LUX);
 
-        // 3. Profil erstellen
+        // 3. Profil
         if (!IPS_VariableProfileExists("BWM.Mode")) {
             IPS_CreateVariableProfile("BWM.Mode", 1);
             IPS_SetVariableProfileAssociation("BWM.Mode", 0, "Auto (Lux)", "Motion", -1);
@@ -35,13 +35,13 @@ class BewegungsmelderProxy extends IPSModule {
             IPS_SetVariableProfileIcon("BWM.Mode", "Gear");
         }
 
-        // 4. Status-Variablen
+        // 4. Variablen
         $this->RegisterVariableBoolean("Status", "Licht Status", "~Switch", 10);
         $this->RegisterVariableBoolean("Motion", "Bewegung", "~Motion", 20);
         $this->RegisterVariableInteger("Brightness", "Helligkeit", "~Illumination", 30);
         $this->RegisterVariableInteger("Mode", "Modus", "BWM.Mode", 0);
 
-        // 5. Aktionen aktivieren
+        // 5. Aktionen
         $this->EnableAction("Status");
         $this->EnableAction("Mode");
 
@@ -60,15 +60,16 @@ class BewegungsmelderProxy extends IPSModule {
         $btnTopID = $this->ReadPropertyInteger("ButtonTopID");
         $btnBottomID = $this->ReadPropertyInteger("ButtonBottomID");
 
-        // Messages registrieren (Events)
+        // Registrierungen
         if ($motionID > 0) $this->RegisterMessage($motionID, VM_UPDATE);
         if ($lightID > 0) $this->RegisterMessage($lightID, VM_UPDATE);
         if ($luxID > 0) $this->RegisterMessage($luxID, VM_UPDATE);
         if ($extDarkID > 0) $this->RegisterMessage($extDarkID, VM_UPDATE);
-        
-        // Bei Tastern reagieren wir auch auf UPDATE (typisch für HomeMatic PRESS_SHORT)
         if ($btnTopID > 0) $this->RegisterMessage($btnTopID, VM_UPDATE);
         if ($btnBottomID > 0) $this->RegisterMessage($btnBottomID, VM_UPDATE);
+
+        // --- NEU: Helper Scripte anlegen ---
+        $this->CreateHelperScripts();
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data) {
@@ -81,11 +82,8 @@ class BewegungsmelderProxy extends IPSModule {
         
         $value = $Data[0];
 
-        // --- TASTER LOGIK ---
-        
-        // Taste OBEN: Modus auf "Dauer Ein" (1)
-        if ($SenderID == $btnTopID) {
-            // Aktuellen Modus merken, aber nur wenn wir nicht schon im Dauer-Ein sind
+        // TASTER
+        if ($SenderID == $btnTopID && $value === true) {
             $currentMode = $this->GetValue("Mode");
             if ($currentMode != self::MODE_ALWAYS_ON) {
                 $this->WriteAttributeInteger("SavedMode", $currentMode);
@@ -94,22 +92,16 @@ class BewegungsmelderProxy extends IPSModule {
             return;
         }
 
-        // Taste UNTEN: Zurück zum alten Modus
-        if ($SenderID == $btnBottomID) {
+        if ($SenderID == $btnBottomID && $value === true) {
             $savedMode = $this->ReadAttributeInteger("SavedMode");
-            
-            // Sicherheitscheck: Falls im SavedMode zufällig "Dauer Ein" steht (sollte nicht passieren),
-            // fallback auf Automatik, damit man das Licht auch wieder aus bekommt.
             if ($savedMode == self::MODE_ALWAYS_ON) {
                 $savedMode = self::MODE_AUTO_LUX;
             }
-            
             $this->ChangeMode($savedMode);
             return;
         }
 
-        // --- STANDARD LOGIK ---
-
+        // STANDARD
         if ($SenderID == $motionID) {
             $this->SetValue("Motion", $value);
             if ($value === true) {
@@ -133,32 +125,19 @@ class BewegungsmelderProxy extends IPSModule {
         }
     }
 
-    /**
-     * Zentrale Funktion zum Wechseln des Modus inklusive Seiteneffekte
-     */
     private function ChangeMode($newMode) {
         $this->SetValue("Mode", $newMode);
         
-        // Sofortige Reaktion auf Moduswechsel
         if ($newMode == self::MODE_ALWAYS_ON) {
             $this->SwitchLight(true);
-            $this->SetTimerInterval("AutoOffTimer", 0); // Timer aus, bleibt an
-            
+            $this->SetTimerInterval("AutoOffTimer", 0);
         } elseif ($newMode == self::MODE_ALWAYS_OFF) {
             $this->SwitchLight(false);
             $this->SetTimerInterval("AutoOffTimer", 0);
-            
         } elseif ($newMode == self::MODE_AUTO_LUX || $newMode == self::MODE_AUTO_NOLUX) {
-            // Beim Wechsel zurück auf Automatik: 
-            // Optional: Einmal Logik prüfen? Oder Licht erstmal aus?
-            // User-Wunsch war: "Zurückstellen ... und dann auch sofort einmal das Licht ausschaltet"
-            // Wir machen es "sanft": Wir prüfen die Logik. Wenn keine Bewegung -> Aus.
-            
-            // Wenn gerade KEINE Bewegung ist, schalten wir aus.
             if (!$this->GetValue("Motion")) {
                  $this->SwitchLight(false);
             } else {
-                 // Wenn Bewegung ist, lassen wir CheckLogic entscheiden (ggf. anlassen)
                  $this->CheckLogic();
             }
         }
@@ -208,11 +187,6 @@ class BewegungsmelderProxy extends IPSModule {
     private function SwitchLight($state) {
         $targetID = $this->ReadPropertyInteger("TargetLightID");
         if ($targetID > 0 && IPS_VariableExists($targetID)) {
-            // Nur schalten, wenn Status abweicht (reduziert Funklast)
-            // Hinweis: GetValue kann bei Hardware-Variablen manchmal laggen, 
-            // aber wir vertrauen hier unserem Proxy-Status oder holen den echten Wert.
-            // Um sicher zu gehen, senden wir einfach (Idempotenz).
-            
             $this->SetValue("Status", $state);
             @RequestAction($targetID, $state);
         }
@@ -220,11 +194,43 @@ class BewegungsmelderProxy extends IPSModule {
 
     public function TimerEvent() {
         $mode = $this->GetValue("Mode");
-        // Wenn Timer abläuft und wir noch im Auto-Modus sind -> Aus.
         if ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX) {
             $this->SwitchLight(false);
         }
         $this->SetTimerInterval("AutoOffTimer", 0);
+    }
+
+    // --- NEUE HILFSFUNKTION FÜR SCRIPTE ---
+    private function CreateHelperScripts() {
+        // Script "An"
+        $sidAn = @IPS_GetObjectIDByIdent("ScriptAn", $this->InstanceID);
+        if ($sidAn === false) {
+            $sidAn = IPS_CreateScript(0);
+            IPS_SetParent($sidAn, $this->InstanceID);
+            IPS_SetIdent($sidAn, "ScriptAn");
+            IPS_SetName($sidAn, "An");
+            IPS_SetHidden($sidAn, true); // Auf false setzen, wenn du sie sehen willst
+            IPS_SetPosition($sidAn, 100);
+            
+            // Inhalt: Ruft RequestAction auf Parent auf
+            $content = "<?php\nRequestAction(IPS_GetParent(\$_IPS['SELF']), 'Status', true);\n?>";
+            IPS_SetScriptContent($sidAn, $content);
+        }
+
+        // Script "Aus"
+        $sidAus = @IPS_GetObjectIDByIdent("ScriptAus", $this->InstanceID);
+        if ($sidAus === false) {
+            $sidAus = IPS_CreateScript(0);
+            IPS_SetParent($sidAus, $this->InstanceID);
+            IPS_SetIdent($sidAus, "ScriptAus");
+            IPS_SetName($sidAus, "Aus");
+            IPS_SetHidden($sidAus, true); // Auf false setzen, wenn du sie sehen willst
+            IPS_SetPosition($sidAus, 101);
+
+            // Inhalt: Ruft RequestAction auf Parent auf
+            $content = "<?php\nRequestAction(IPS_GetParent(\$_IPS['SELF']), 'Status', false);\n?>";
+            IPS_SetScriptContent($sidAus, $content);
+        }
     }
 }
 ?>
