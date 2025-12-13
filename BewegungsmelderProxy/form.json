@@ -2,6 +2,22 @@
   "elements": [
     {
       "type": "Label",
+      "caption": "Hardware Taster (Optional)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "ButtonTopID",
+      "caption": "Taste Oben (Schaltet Dauer-Ein)",
+      "width": "600px"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "ButtonBottomID",
+      "caption": "Taste Unten (Zurück zum vorigen Modus)",
+      "width": "600px"
+    },
+    {
+      "type": "Label",
       "caption": "Hardware Verknüpfungen"
     },
     {
