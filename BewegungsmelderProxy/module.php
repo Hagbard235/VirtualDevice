@@ -179,7 +179,9 @@ class BewegungsmelderProxy extends IPSModule {
         if ($mode == self::MODE_AUTO_NOLUX) {
             $shouldSwitch = true;
         } elseif ($mode == self::MODE_AUTO_LUX) {
-            if ($this->IsDarkEnough()) {
+            // Wenn es dunkel genug ist ODER das Licht bereits an ist (dann ist es ja hell wegen uns),
+            // dann soll nachgetriggert werden.
+            if ($this->IsDarkEnough() || $this->GetValue("Status")) {
                 $shouldSwitch = true;
             }
         }
