@@ -131,8 +131,18 @@ class BewegungsmelderProxy extends IPSModule {
             }
         } elseif ($SenderID == $lightID) {
             $this->SetValue("Status", $value);
-        } elseif ($SenderID == $luxID) {
-            $this->SetValue("Brightness", $value);
+        } elseif ($SenderID == $luxID || $SenderID == $extDarkID) {
+             if ($SenderID == $luxID) {
+                $this->SetValue("Brightness", $value);
+             }
+             
+             // Race Condition Fix:
+             // Falls Hardware erst Bewegung meldet (noch zu hell) und millisekunden später den neuen Helligkeitswert,
+             // müssen wir hier nach-prüfen, sofern Bewegung noch aktiv ist.
+             if ($this->GetValue("Motion")) {
+                 $this->SendDebug("Logic", "Brightness/Darkness update while Motion is active -> Re-evaluating Logic", 0);
+                 $this->CheckLogic();
+             }
         }
     }
 
