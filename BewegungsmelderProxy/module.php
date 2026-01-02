@@ -78,12 +78,21 @@ class BewegungsmelderProxy extends IPSModule {
         $motionID = $this->ReadPropertyInteger("SourceMotionID");
         $lightID = $this->ReadPropertyInteger("TargetLightID");
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
+        $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         $btnTopID = $this->ReadPropertyInteger("ButtonTopID");
         $btnBottomID = $this->ReadPropertyInteger("ButtonBottomID");
         
         $value = $Data[0];
         
-        $this->SendDebug("MessageSink", "Sender: $SenderID, Value: " . json_encode($value), 0);
+        $senderName = "Unknown";
+        if ($SenderID == $motionID) $senderName = "Motion Sensor";
+        elseif ($SenderID == $lightID) $senderName = "Target Light State";
+        elseif ($SenderID == $luxID) $senderName = "Brightness Sensor";
+        elseif ($SenderID == $extDarkID) $senderName = "External Dark Trigger";
+        elseif ($SenderID == $btnTopID) $senderName = "Button Top";
+        elseif ($SenderID == $btnBottomID) $senderName = "Button Bottom";
+
+        $this->SendDebug("MessageSink", "Event from $senderName ($SenderID), Value: " . json_encode($value), 0);
 
         // --- TASTER LOGIK ---
         
