@@ -82,6 +82,8 @@ class BewegungsmelderProxy extends IPSModule {
         $btnBottomID = $this->ReadPropertyInteger("ButtonBottomID");
         
         $value = $Data[0];
+        
+        $this->SendDebug("MessageSink", "Sender: $SenderID, Value: " . json_encode($value), 0);
 
         // --- TASTER LOGIK ---
         
@@ -90,6 +92,7 @@ class BewegungsmelderProxy extends IPSModule {
         if ($SenderID == $btnTopID && $value === true) {
             $currentMode = $this->GetValue("Mode");
             if ($currentMode != self::MODE_ALWAYS_ON) {
+                $this->SendDebug("Button", "Top Button pressed. Switching to ALWAYS_ON", 0);
                 $this->WriteAttributeInteger("SavedMode", $currentMode);
                 $this->ChangeMode(self::MODE_ALWAYS_ON);
             }
@@ -105,6 +108,7 @@ class BewegungsmelderProxy extends IPSModule {
                 $savedMode = self::MODE_AUTO_LUX;
             }
             
+            $this->SendDebug("Button", "Bottom Button pressed. Restoring mode: " . $savedMode, 0);
             $this->ChangeMode($savedMode);
             return;
         }
@@ -143,6 +147,7 @@ class BewegungsmelderProxy extends IPSModule {
     }
 
     private function ChangeMode($newMode) {
+        $this->SendDebug("Mode", "Changing Mode to: " . $newMode, 0);
         $this->SetValue("Mode", $newMode);
         
         // Sofortige Reaktion auf Moduswechsel
@@ -167,6 +172,7 @@ class BewegungsmelderProxy extends IPSModule {
 
     private function CheckLogic() {
         $mode = $this->GetValue("Mode");
+        $this->SendDebug("Logic", "CheckLogic triggered. Current Mode: " . $mode, 0);
         
         if ($mode == self::MODE_ALWAYS_OFF) return;
         
@@ -189,15 +195,21 @@ class BewegungsmelderProxy extends IPSModule {
         if ($shouldSwitch) {
             $this->SwitchLight(true);
             $duration = $this->ReadPropertyInteger("Duration") * 1000;
+            $this->SendDebug("Logic", "Switching ON (or extending). Timer set to " . ($duration/1000) . "s", 0);
             $this->SetTimerInterval("AutoOffTimer", $duration);
+        } else {
+            $this->SendDebug("CheckLogic", "Conditions not met. No switch/extension.", 0);
         }
     }
 
     private function IsDarkEnough() {
+        $this->SendDebug("IsDarkEnough", "Checking if it's dark enough.", 0);
         // 1. Priorität: Externe Variable
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         if ($extDarkID > 0 && IPS_VariableExists($extDarkID)) {
-            return GetValueBoolean($extDarkID);
+            $val = GetValueBoolean($extDarkID);
+            $this->SendDebug("IsDarkEnough", "External Var ($extDarkID) says: " . ($val ? "Dark" : "Bright"), 0);
+            return $val;
         }
 
         // 2. Priorität: Interne Helligkeit vs Threshold
@@ -205,22 +217,29 @@ class BewegungsmelderProxy extends IPSModule {
         if ($luxID > 0 && IPS_VariableExists($luxID)) {
             $lux = GetValue($luxID);
             $threshold = $this->ReadPropertyInteger("Threshold");
-            return ($lux <= $threshold);
+            $isDark = ($lux <= $threshold);
+            $this->SendDebug("IsDarkEnough", "Lux: $lux <= Threshold: $threshold ? " . ($isDark ? "YES" : "NO"), 0);
+            return $isDark;
         }
 
         // Fallback: Immer dunkel annehmen
+        $this->SendDebug("IsDarkEnough", "No sources defined. Assuming DARK.", 0);
         return true; 
     }
 
     private function SwitchLight($state) {
         $targetID = $this->ReadPropertyInteger("TargetLightID");
-        if ($targetID > 0 && IPS_VariableExists($targetID)) {
+        if ($targetID > 0 && IPS_VariableExists($targetID)) {            
+            $this->SendDebug("SwitchLight", "Setting Device $targetID to " . ($state ? "TRUE" : "FALSE"), 0);
             $this->SetValue("Status", $state);
             @RequestAction($targetID, $state);
+        } else {
+            $this->SendDebug("SwitchLight", "No TargetLightID configured or variable does not exist. Cannot switch light.", 0);
         }
     }
 
     public function TimerEvent() {
+        $this->SendDebug("Timer", "AutoOffTimer Expired", 0);
         $mode = $this->GetValue("Mode");
         // Nur ausschalten, wenn wir im Auto-Modus sind
         if ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX) {
