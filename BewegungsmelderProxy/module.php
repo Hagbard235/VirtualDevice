@@ -12,6 +12,11 @@ class BewegungsmelderProxy extends IPSModule {
         parent::Create();
 
         // 1. Properties registrieren
+        $this->RegisterPropertyInteger("ButtonAlwaysOnID", 0);
+        $this->RegisterPropertyInteger("ButtonAlwaysOffID", 0);
+        $this->RegisterPropertyInteger("ButtonAutoID", 0);
+        
+        // Veraltete Properties für Migration
         $this->RegisterPropertyInteger("ButtonTopID", 0);
         $this->RegisterPropertyInteger("ButtonBottomID", 0);
         
@@ -57,8 +62,26 @@ class BewegungsmelderProxy extends IPSModule {
         $lightID = $this->ReadPropertyInteger("TargetLightID");
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
-        $btnTopID = $this->ReadPropertyInteger("ButtonTopID");
-        $btnBottomID = $this->ReadPropertyInteger("ButtonBottomID");
+        
+        // Migration alter Properties
+        $oldTop = $this->ReadPropertyInteger("ButtonTopID");
+        if ($oldTop > 0) {
+            IPS_SetProperty($this->InstanceID, "ButtonAlwaysOnID", $oldTop);
+            IPS_SetProperty($this->InstanceID, "ButtonTopID", 0); // Löschen
+            IPS_ApplyChanges($this->InstanceID); // Rekursiver Aufruf für sauberes Reload
+            return; 
+        }
+        $oldBottom = $this->ReadPropertyInteger("ButtonBottomID");
+        if ($oldBottom > 0) {
+            IPS_SetProperty($this->InstanceID, "ButtonAutoID", $oldBottom);
+            IPS_SetProperty($this->InstanceID, "ButtonBottomID", 0); // Löschen
+            IPS_ApplyChanges($this->InstanceID);
+            return;
+        }
+
+        $btnOnID = $this->ReadPropertyInteger("ButtonAlwaysOnID");
+        $btnOffID = $this->ReadPropertyInteger("ButtonAlwaysOffID");
+        $btnAutoID = $this->ReadPropertyInteger("ButtonAutoID");
 
         // Messages registrieren
         // Wir nutzen VM_UPDATE, damit auch Taster erkannt werden, die ihren Wert nur aktualisieren (Timestamp), aber nicht ändern.
@@ -66,8 +89,9 @@ class BewegungsmelderProxy extends IPSModule {
         if ($lightID > 0) $this->RegisterMessage($lightID, VM_UPDATE);
         if ($luxID > 0) $this->RegisterMessage($luxID, VM_UPDATE);
         if ($extDarkID > 0) $this->RegisterMessage($extDarkID, VM_UPDATE);
-        if ($btnTopID > 0) $this->RegisterMessage($btnTopID, VM_UPDATE);
-        if ($btnBottomID > 0) $this->RegisterMessage($btnBottomID, VM_UPDATE);
+        if ($btnOnID > 0) $this->RegisterMessage($btnOnID, VM_UPDATE);
+        if ($btnOffID > 0) $this->RegisterMessage($btnOffID, VM_UPDATE);
+        if ($btnAutoID > 0) $this->RegisterMessage($btnAutoID, VM_UPDATE);
 
         // Helper Scripte (An/Aus) anlegen oder aktualisieren
         $this->CreateHelperScripts();
@@ -79,8 +103,9 @@ class BewegungsmelderProxy extends IPSModule {
         $lightID = $this->ReadPropertyInteger("TargetLightID");
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
-        $btnTopID = $this->ReadPropertyInteger("ButtonTopID");
-        $btnBottomID = $this->ReadPropertyInteger("ButtonBottomID");
+        $btnOnID = $this->ReadPropertyInteger("ButtonAlwaysOnID");
+        $btnOffID = $this->ReadPropertyInteger("ButtonAlwaysOffID");
+        $btnAutoID = $this->ReadPropertyInteger("ButtonAutoID");
         
         $value = $Data[0];
         
@@ -89,35 +114,48 @@ class BewegungsmelderProxy extends IPSModule {
         elseif ($SenderID == $lightID) $senderName = "Target Light State";
         elseif ($SenderID == $luxID) $senderName = "Brightness Sensor";
         elseif ($SenderID == $extDarkID) $senderName = "External Dark Trigger";
-        elseif ($SenderID == $btnTopID) $senderName = "Button Top";
-        elseif ($SenderID == $btnBottomID) $senderName = "Button Bottom";
+        elseif ($SenderID == $btnOnID) $senderName = "Button Always ON";
+        elseif ($SenderID == $btnOffID) $senderName = "Button Always OFF";
+        elseif ($SenderID == $btnAutoID) $senderName = "Button Auto/Restore";
 
         $this->SendDebug("MessageSink", "Event from $senderName ($SenderID), Value: " . json_encode($value), 0);
 
         // --- TASTER LOGIK ---
         
-        // Taste OBEN: Modus auf "Dauer Ein"
-        // Check auf $value === true, um sicherzugehen, dass es ein "Drücken" ist (und kein Loslassen bei Toggles)
-        if ($SenderID == $btnTopID && $value === true) {
+        // --- TASTER LOGIK ---
+        
+        // Taste DAUER EIN
+        if ($SenderID == $btnOnID && $value === true) {
             $currentMode = $this->GetValue("Mode");
             if ($currentMode != self::MODE_ALWAYS_ON) {
-                $this->SendDebug("Button", "Top Button pressed. Switching to ALWAYS_ON", 0);
+                $this->SendDebug("Button", "Switching to ALWAYS_ON", 0);
                 $this->WriteAttributeInteger("SavedMode", $currentMode);
                 $this->ChangeMode(self::MODE_ALWAYS_ON);
             }
             return;
         }
 
-        // Taste UNTEN: Zurück zum alten Modus
-        if ($SenderID == $btnBottomID && $value === true) {
+        // Taste DAUER AUS
+        if ($SenderID == $btnOffID && $value === true) {
+            $currentMode = $this->GetValue("Mode");
+            if ($currentMode != self::MODE_ALWAYS_OFF) {
+                $this->SendDebug("Button", "Switching to ALWAYS_OFF", 0);
+                $this->WriteAttributeInteger("SavedMode", $currentMode); // AUCH hier speichern, falls man von Auto kommt
+                $this->ChangeMode(self::MODE_ALWAYS_OFF);
+            }
+            return;
+        }
+
+        // Taste AUTO / RESTORE
+        if ($SenderID == $btnAutoID && $value === true) {
             $savedMode = $this->ReadAttributeInteger("SavedMode");
             
-            // Fallback, falls SavedMode ungültig oder unlogisch wäre
-            if ($savedMode == self::MODE_ALWAYS_ON) {
+            // Plausibilitätscheck
+            if ($savedMode == self::MODE_ALWAYS_ON || $savedMode == self::MODE_ALWAYS_OFF) {
                 $savedMode = self::MODE_AUTO_LUX;
             }
             
-            $this->SendDebug("Button", "Bottom Button pressed. Restoring mode: " . $savedMode, 0);
+            $this->SendDebug("Button", "Restore/Auto Button pressed. Mode: " . $savedMode, 0);
             $this->ChangeMode($savedMode);
             return;
         }
@@ -149,7 +187,18 @@ class BewegungsmelderProxy extends IPSModule {
     public function RequestAction($Ident, $Value) {
         switch ($Ident) {
             case "Status":
+                // Manuelles Schalten der Status-Variable
                 $this->SwitchLight($Value);
+                if ($Value) {
+                    // Manuell AN -> Timer starten (simuliert Bewegung)
+                    $duration = $this->ReadPropertyInteger("Duration") * 1000;
+                    $this->SendDebug("Manual", "Switched ON manually. Starting Timer: " . ($duration/1000) . "s", 0);
+                    $this->SetTimerInterval("AutoOffTimer", $duration);
+                } else {
+                    // Manuell AUS -> Timer stoppen
+                    $this->SendDebug("Manual", "Switched OFF manually. Stopping Timer.", 0);
+                    $this->SetTimerInterval("AutoOffTimer", 0);
+                }
                 break;
             case "Mode":
                 $this->ChangeMode($Value);
