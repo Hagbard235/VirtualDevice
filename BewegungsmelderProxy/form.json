@@ -6,14 +6,20 @@
     },
     {
       "type": "SelectVariable",
-      "name": "ButtonTopID",
-      "caption": "Taste Oben (Schaltet Dauer-Ein)",
+      "name": "ButtonAlwaysOnID",
+      "caption": "Taste: Dauer-Ein",
       "width": "600px"
     },
     {
       "type": "SelectVariable",
-      "name": "ButtonBottomID",
-      "caption": "Taste Unten (Zurück zum vorigen Modus)",
+      "name": "ButtonAlwaysOffID",
+      "caption": "Taste: Dauer-Aus",
+      "width": "600px"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "ButtonAutoID",
+      "caption": "Taste: Automatik / Reset",
       "width": "600px"
     },
     {
