@@ -101,6 +101,10 @@ class BewegungsmelderProxy extends IPSModule {
             foreach ($motionSensors as $sensor) {
                 $mID = $sensor['VariableID'];
                 if ($mID > 0) $this->RegisterMessage($mID, VM_UPDATE);
+                if (isset($sensor['BrightnessVariableID'])) {
+                    $bID = $sensor['BrightnessVariableID'];
+                    if ($bID > 0) $this->RegisterMessage($bID, VM_UPDATE);
+                }
             }
         }
         if ($lightID > 0) $this->RegisterMessage($lightID, VM_UPDATE);
@@ -129,13 +133,23 @@ class BewegungsmelderProxy extends IPSModule {
         $senderName = "Unknown";
         $isMotionSender = false;
         
-        // Prüfen ob Sender einer der Motion Sensoren ist
+        // Prüfen ob Sender einer der Motion Sensoren ist ODER ein lokaler Helligkeitssensor
+        $isLocalBrightnessSender = false;
+        $linkedMotionID = 0; // Zuordnung bei Motion oder lokalem Helligkeitssensor
+
         if (is_array($motionSensors)) {
             foreach ($motionSensors as $sensor) {
                 if ($SenderID == $sensor['VariableID']) {
                     $senderName = "Motion Sensor (" . $SenderID . ")";
                     $isMotionSender = true;
+                    $linkedMotionID = $SenderID;
                     break;
+                }
+                if (isset($sensor['BrightnessVariableID']) && $SenderID == $sensor['BrightnessVariableID']) {
+                     $senderName = "Local Brightness Sensor (" . $SenderID . ")";
+                     $isLocalBrightnessSender = true;
+                     $linkedMotionID = $sensor['VariableID']; // Zugehöriger Bewegungsmelder
+                     break;
                 }
             }
         }
@@ -201,11 +215,11 @@ class BewegungsmelderProxy extends IPSModule {
             $this->SetValue("Motion", $unifiedMotion);
             
             if ($unifiedMotion === true) {
-                $this->CheckLogic();
+                $this->CheckLogic($linkedMotionID);
             }
         } elseif ($SenderID == $lightID) {
             $this->SetValue("Status", $value);
-        } elseif ($SenderID == $luxID || $SenderID == $extDarkID) {
+        } elseif ($SenderID == $luxID || $SenderID == $extDarkID || $isLocalBrightnessSender) {
              if ($SenderID == $luxID) {
                 $this->SetValue("Brightness", $value);
              }
@@ -215,7 +229,8 @@ class BewegungsmelderProxy extends IPSModule {
              // müssen wir hier nach-prüfen, sofern Bewegung noch aktiv ist.
              if ($this->GetValue("Motion")) {
                  $this->SendDebug("Logic", "Brightness/Darkness update while Motion is active -> Re-evaluating Logic", 0);
-                 $this->CheckLogic();
+                 $recheckID = $isLocalBrightnessSender ? $linkedMotionID : 0;
+                 $this->CheckLogic($recheckID);
              }
         }
     }
@@ -274,9 +289,9 @@ class BewegungsmelderProxy extends IPSModule {
         }
     }
 
-    private function CheckLogic() {
+    private function CheckLogic($triggerSensorID = 0) {
         $mode = $this->GetValue("Mode");
-        $this->SendDebug("Logic", "CheckLogic triggered. Current Mode: " . $mode, 0);
+        $this->SendDebug("Logic", "CheckLogic triggered. Current Mode: " . $mode . ", Trigger: " . $triggerSensorID, 0);
         
         if ($mode == self::MODE_ALWAYS_OFF) return;
         
@@ -291,7 +306,8 @@ class BewegungsmelderProxy extends IPSModule {
         } elseif ($mode == self::MODE_AUTO_LUX) {
             // Wenn es dunkel genug ist ODER das Licht bereits an ist (dann ist es ja hell wegen uns),
             // dann soll nachgetriggert werden.
-            if ($this->IsDarkEnough() || $this->GetValue("Status")) {
+            // CheckLogic berücksichtigt jetzt den Trigger-Sensor für lokale Helligkeit
+            if ($this->IsDarkEnough($triggerSensorID) || $this->GetValue("Status")) {
                 $shouldSwitch = true;
             }
         }
@@ -306,8 +322,31 @@ class BewegungsmelderProxy extends IPSModule {
         }
     }
 
-    private function IsDarkEnough() {
-        $this->SendDebug("IsDarkEnough", "Checking if it's dark enough.", 0);
+    private function IsDarkEnough($triggerSensorID = 0) {
+        $this->SendDebug("IsDarkEnough", "Checking if it's dark enough. Trigger: $triggerSensorID", 0);
+        
+        // 0. Sonderprüfung für Trigger-Sensor (Zone)
+        if ($triggerSensorID > 0) {
+            $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
+            if (is_array($motionSensors)) {
+                foreach ($motionSensors as $sensor) {
+                     if ($sensor['VariableID'] == $triggerSensorID) {
+                         if (isset($sensor['BrightnessVariableID']) && $sensor['BrightnessVariableID'] > 0) {
+                             $bID = $sensor['BrightnessVariableID'];
+                             if (IPS_VariableExists($bID)) {
+                                 $lux = GetValue($bID);
+                                 $threshold = $this->ReadPropertyInteger("Threshold");
+                                 $isDark = ($lux <= $threshold);
+                                 $this->SendDebug("IsDarkEnough", "Zone ($triggerSensorID) Brightness ($bID): $lux <= $threshold ? " . ($isDark ? "YES" : "NO"), 0);
+                                 return $isDark;
+                             }
+                         }
+                         break; 
+                     }
+                }
+            }
+        }
+
         // 1. Priorität: Externe Variable
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         if ($extDarkID > 0 && IPS_VariableExists($extDarkID)) {

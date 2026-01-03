@@ -41,9 +41,18 @@
       "delete": true,
       "columns": [
         {
-          "caption": "Variable",
+          "caption": "Bewegung (Variable)",
           "name": "VariableID",
-          "width": "500px",
+          "width": "350px",
+          "add": 0,
+          "edit": {
+            "type": "SelectVariable"
+          }
+        },
+        {
+          "caption": "Helligkeit (Optional, Variable)",
+          "name": "BrightnessVariableID",
+          "width": "350px",
           "add": 0,
           "edit": {
             "type": "SelectVariable"
