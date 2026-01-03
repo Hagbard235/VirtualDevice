@@ -8,6 +8,8 @@ class BewegungsmelderProxy extends IPSModule {
     const MODE_ALWAYS_OFF = 2;
     const MODE_AUTO_NOLUX = 3;
 
+    private $lastSwitchTimestamp = 0;
+
     public function Create() {
         parent::Create();
 
@@ -218,7 +220,12 @@ class BewegungsmelderProxy extends IPSModule {
                 $this->CheckLogic($linkedMotionID);
             }
         } elseif ($SenderID == $lightID) {
-            $this->SetValue("Status", $value);
+            // Debounce: Wenn wir gerade erst geschaltet haben, ignorieren wir Echos
+            if ((microtime(true) - $this->lastSwitchTimestamp) < 3.0) {
+                 $this->SendDebug("MessageSink", "Ignoring Status Event from Light (Debounce active)", 0);
+            } else {
+                 $this->SetValue("Status", $value);
+            }
         } elseif ($SenderID == $luxID || $SenderID == $extDarkID || $isLocalBrightnessSender) {
              if ($SenderID == $luxID) {
                 $this->SetValue("Brightness", $value);
@@ -335,6 +342,7 @@ class BewegungsmelderProxy extends IPSModule {
                              $bID = $sensor['BrightnessVariableID'];
                              if (IPS_VariableExists($bID)) {
                                  $lux = GetValue($bID);
+                                 $this->SetValue("Brightness", $lux); // Update display variable
                                  $threshold = $this->ReadPropertyInteger("Threshold");
                                  $isDark = ($lux <= $threshold);
                                  $this->SendDebug("IsDarkEnough", "Zone ($triggerSensorID) Brightness ($bID): $lux <= $threshold ? " . ($isDark ? "YES" : "NO"), 0);
@@ -359,6 +367,7 @@ class BewegungsmelderProxy extends IPSModule {
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         if ($luxID > 0 && IPS_VariableExists($luxID)) {
             $lux = GetValue($luxID);
+            $this->SetValue("Brightness", $lux); // Update display
             $threshold = $this->ReadPropertyInteger("Threshold");
             $isDark = ($lux <= $threshold);
             $this->SendDebug("IsDarkEnough", "Lux: $lux <= Threshold: $threshold ? " . ($isDark ? "YES" : "NO"), 0);
@@ -373,9 +382,21 @@ class BewegungsmelderProxy extends IPSModule {
     private function SwitchLight($state) {
         $targetID = $this->ReadPropertyInteger("TargetLightID");
         if ($targetID > 0 && IPS_VariableExists($targetID)) {            
-            $this->SendDebug("SwitchLight", "Setting Device $targetID to " . ($state ? "TRUE" : "FALSE"), 0);
+            // Traffic-Optimierung: Nur schalten, wenn Zustand abweicht
+            $currentState = GetValueBoolean($targetID);
+            
+            // Wenn wir schalten, merken wir uns den Zeitpunkt, um einkommende "falsche" Echos 
+            // vom Hilfsskript für kurze Zeit zu ignorieren.
+            $this->lastSwitchTimestamp = microtime(true);
+
+            if ($currentState !== $state) {
+                $this->SendDebug("SwitchLight", "Setting Device $targetID to " . ($state ? "TRUE" : "FALSE"), 0);
+                @RequestAction($targetID, $state);
+            } else {
+                //$this->SendDebug("SwitchLight", "Device $targetID is already " . ($state ? "TRUE" : "FALSE") . ". Skipping.", 0);
+            }
+            // Interne Variable immer synchron halten
             $this->SetValue("Status", $state);
-            @RequestAction($targetID, $state);
         } else {
             $this->SendDebug("SwitchLight", "No TargetLightID configured or variable does not exist. Cannot switch light.", 0);
         }
