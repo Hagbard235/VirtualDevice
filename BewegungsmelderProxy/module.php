@@ -21,7 +21,8 @@ class BewegungsmelderProxy extends IPSModule {
         $this->RegisterPropertyInteger("ButtonBottomID", 0);
         
         $this->RegisterPropertyInteger("TargetLightID", 0);
-        $this->RegisterPropertyInteger("SourceMotionID", 0);
+        $this->RegisterPropertyString("MotionSensors", "[]");
+        $this->RegisterPropertyInteger("SourceMotionID", 0); // Veraltet -> Migration
         $this->RegisterPropertyInteger("SourceBrightnessID", 0);
         $this->RegisterPropertyInteger("SourceIsDarkID", 0);
         $this->RegisterPropertyInteger("Threshold", 120);
@@ -57,8 +58,18 @@ class BewegungsmelderProxy extends IPSModule {
     public function ApplyChanges() {
         parent::ApplyChanges();
 
+        // Migration Motion ID -> Liste
+        $oldMotionID = $this->ReadPropertyInteger("SourceMotionID");
+        if ($oldMotionID > 0) {
+            $newList = json_encode([['VariableID' => $oldMotionID]]);
+            IPS_SetProperty($this->InstanceID, "MotionSensors", $newList);
+            IPS_SetProperty($this->InstanceID, "SourceMotionID", 0);
+            IPS_ApplyChanges($this->InstanceID);
+            return;
+        }
+
         // IDs lesen
-        $motionID = $this->ReadPropertyInteger("SourceMotionID");
+        $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
         $lightID = $this->ReadPropertyInteger("TargetLightID");
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
@@ -85,7 +96,13 @@ class BewegungsmelderProxy extends IPSModule {
 
         // Messages registrieren
         // Wir nutzen VM_UPDATE, damit auch Taster erkannt werden, die ihren Wert nur aktualisieren (Timestamp), aber nicht ändern.
-        if ($motionID > 0) $this->RegisterMessage($motionID, VM_UPDATE);
+        // Messages für alle Motion Sensoren registrieren
+        if (is_array($motionSensors)) {
+            foreach ($motionSensors as $sensor) {
+                $mID = $sensor['VariableID'];
+                if ($mID > 0) $this->RegisterMessage($mID, VM_UPDATE);
+            }
+        }
         if ($lightID > 0) $this->RegisterMessage($lightID, VM_UPDATE);
         if ($luxID > 0) $this->RegisterMessage($luxID, VM_UPDATE);
         if ($extDarkID > 0) $this->RegisterMessage($extDarkID, VM_UPDATE);
@@ -99,7 +116,7 @@ class BewegungsmelderProxy extends IPSModule {
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data) {
         
-        $motionID = $this->ReadPropertyInteger("SourceMotionID");
+        $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
         $lightID = $this->ReadPropertyInteger("TargetLightID");
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
@@ -110,7 +127,20 @@ class BewegungsmelderProxy extends IPSModule {
         $value = $Data[0];
         
         $senderName = "Unknown";
-        if ($SenderID == $motionID) $senderName = "Motion Sensor";
+        $isMotionSender = false;
+        
+        // Prüfen ob Sender einer der Motion Sensoren ist
+        if (is_array($motionSensors)) {
+            foreach ($motionSensors as $sensor) {
+                if ($SenderID == $sensor['VariableID']) {
+                    $senderName = "Motion Sensor (" . $SenderID . ")";
+                    $isMotionSender = true;
+                    break;
+                }
+            }
+        }
+        
+        if ($isMotionSender) { /* already handled above */ }
         elseif ($SenderID == $lightID) $senderName = "Target Light State";
         elseif ($SenderID == $luxID) $senderName = "Brightness Sensor";
         elseif ($SenderID == $extDarkID) $senderName = "External Dark Trigger";
@@ -162,9 +192,15 @@ class BewegungsmelderProxy extends IPSModule {
 
         // --- STANDARD LOGIK ---
 
-        if ($SenderID == $motionID) {
-            $this->SetValue("Motion", $value);
-            if ($value === true) {
+        // --- STANDARD LOGIK ---
+
+        if ($isMotionSender) {
+            // Gesamtzustand ermitteln (ODER Verknüpfung aller Sensoren)
+            // Wir nutzen nicht nur $value, da jetzt auch ein anderer Sensor aktiv sein könnte.
+            $unifiedMotion = $this->GetMotionState();
+            $this->SetValue("Motion", $unifiedMotion);
+            
+            if ($unifiedMotion === true) {
                 $this->CheckLogic();
             }
         } elseif ($SenderID == $lightID) {
@@ -314,6 +350,19 @@ class BewegungsmelderProxy extends IPSModule {
             $this->SwitchLight(false);
         }
         $this->SetTimerInterval("AutoOffTimer", 0);
+    }
+
+    private function GetMotionState() {
+        $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
+        if (!is_array($motionSensors)) return false;
+        
+        foreach ($motionSensors as $sensor) {
+            $id = $sensor['VariableID'];
+            if ($id > 0 && IPS_VariableExists($id)) {
+                if (GetValueBoolean($id)) return true;
+            }
+        }
+        return false;
     }
 
     private function CreateHelperScripts() {

@@ -33,10 +33,23 @@
       "width": "600px"
     },
     {
-      "type": "SelectVariable",
-      "name": "SourceMotionID",
-      "caption": "Quelle: Bewegung (Variable)",
-      "width": "600px"
+      "type": "List",
+      "name": "MotionSensors",
+      "caption": "Bewegungsmelder (Alle verknüpft per ODER)",
+      "rowCount": 5,
+      "add": true,
+      "delete": true,
+      "columns": [
+        {
+          "caption": "Variable",
+          "name": "VariableID",
+          "width": "500px",
+          "add": 0,
+          "edit": {
+            "type": "SelectVariable"
+          }
+        }
+      ]
     },
     {
       "type": "Label",
