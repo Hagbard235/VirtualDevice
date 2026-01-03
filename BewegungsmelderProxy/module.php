@@ -383,6 +383,16 @@ class BewegungsmelderProxy extends IPSModule {
 
     public function TimerEvent() {
         $this->SendDebug("Timer", "AutoOffTimer Expired", 0);
+        
+        // Safety Check: Ist noch Bewegung da?
+        // Wenn der Sensor noch "True" meldet (Dauerpräsenz), darf das Licht nicht ausgehen.
+        if ($this->GetValue("Motion")) {
+             $duration = $this->ReadPropertyInteger("Duration") * 1000;
+             $this->SendDebug("Timer", "Motion still active! Extending timer by " . ($duration/1000) . "s", 0);
+             $this->SetTimerInterval("AutoOffTimer", $duration);
+             return;
+        }
+
         $mode = $this->GetValue("Mode");
         // Nur ausschalten, wenn wir im Auto-Modus sind
         if ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX) {
