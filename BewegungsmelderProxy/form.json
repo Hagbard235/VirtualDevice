@@ -83,6 +83,11 @@
       "width": "600px"
     },
     {
+      "type": "CheckBox",
+      "name": "InvertIsDark",
+      "caption": "Invertieren (True = Hell)"
+    },
+    {
       "type": "Label",
       "caption": "Zeiten"
     },

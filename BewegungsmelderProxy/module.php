@@ -27,6 +27,7 @@ class BewegungsmelderProxy extends IPSModule {
         $this->RegisterPropertyInteger("SourceMotionID", 0); // Veraltet -> Migration
         $this->RegisterPropertyInteger("SourceBrightnessID", 0);
         $this->RegisterPropertyInteger("SourceIsDarkID", 0);
+        $this->RegisterPropertyBoolean("InvertIsDark", false);
         $this->RegisterPropertyInteger("Threshold", 120);
         $this->RegisterPropertyInteger("Duration", 300);
 
@@ -47,7 +48,11 @@ class BewegungsmelderProxy extends IPSModule {
         $this->RegisterVariableBoolean("Status", "Licht Status", "~Switch", 10);
         $this->RegisterVariableBoolean("Motion", "Bewegung", "~Motion", 20);
         $this->RegisterVariableInteger("Brightness", "Helligkeit", "~Illumination", 30);
+        $this->RegisterVariableInteger("ThresholdVar", "Schaltschwelle", "", 35);
+        $this->EnableAction("ThresholdVar");
+        
         $this->RegisterVariableInteger("Mode", "Modus", "BWM.Mode", 0);
+        $this->EnableAction("Mode");
 
         // 5. Aktionen aktivieren
         $this->EnableAction("Status");
@@ -75,6 +80,12 @@ class BewegungsmelderProxy extends IPSModule {
         $lightID = $this->ReadPropertyInteger("TargetLightID");
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
+        
+        // Initialisierung ThresholdVar falls leer (z.B. nach Update)
+        if ($this->GetValue("ThresholdVar") == 0) {
+             $this->SetValue("ThresholdVar", $this->ReadPropertyInteger("Threshold"));
+        }
+
         
         // Migration alter Properties
         $oldTop = $this->ReadPropertyInteger("ButtonTopID");
@@ -261,6 +272,9 @@ class BewegungsmelderProxy extends IPSModule {
             case "Mode":
                 $this->ChangeMode($Value);
                 break;
+            case "ThresholdVar":
+                $this->SetValue("ThresholdVar", $Value);
+                break;
         }
     }
 
@@ -332,6 +346,10 @@ class BewegungsmelderProxy extends IPSModule {
     private function IsDarkEnough($triggerSensorID = 0) {
         $this->SendDebug("IsDarkEnough", "Checking if it's dark enough. Trigger: $triggerSensorID", 0);
         
+        // Helper: Ermittle aktuellen Threshold (Variable hat Vorrang vor Property)
+        $threshold = $this->GetValue("ThresholdVar");
+        if ($threshold == 0) $threshold = $this->ReadPropertyInteger("Threshold"); // Fallback
+        
         // 0. Sonderprüfung für Trigger-Sensor (Zone)
         if ($triggerSensorID > 0) {
             $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
@@ -343,9 +361,8 @@ class BewegungsmelderProxy extends IPSModule {
                              if (IPS_VariableExists($bID)) {
                                  $lux = GetValue($bID);
                                  $this->SetValue("Brightness", $lux); // Update display variable
-                                 $threshold = $this->ReadPropertyInteger("Threshold");
                                  $isDark = ($lux <= $threshold);
-                                 $this->SendDebug("IsDarkEnough", "Zone ($triggerSensorID) Brightness ($bID): $lux <= $threshold ? " . ($isDark ? "YES" : "NO"), 0);
+                                 $this->SendDebug("IsDarkEnough", "Zone ($triggerSensorID) Brightness ($bID): $lux <= Threshold ($threshold) ? " . ($isDark ? "YES" : "NO"), 0);
                                  return $isDark;
                              }
                          }
@@ -359,6 +376,11 @@ class BewegungsmelderProxy extends IPSModule {
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         if ($extDarkID > 0 && IPS_VariableExists($extDarkID)) {
             $val = GetValueBoolean($extDarkID);
+            // Invertierung prüfen
+            if ($this->ReadPropertyBoolean("InvertIsDark")) {
+                $val = !$val;
+                //$this->SendDebug("IsDarkEnough", "InvertIsDark active.", 0);
+            }
             $this->SendDebug("IsDarkEnough", "External Var ($extDarkID) says: " . ($val ? "Dark" : "Bright"), 0);
             return $val;
         }
@@ -368,7 +390,6 @@ class BewegungsmelderProxy extends IPSModule {
         if ($luxID > 0 && IPS_VariableExists($luxID)) {
             $lux = GetValue($luxID);
             $this->SetValue("Brightness", $lux); // Update display
-            $threshold = $this->ReadPropertyInteger("Threshold");
             $isDark = ($lux <= $threshold);
             $this->SendDebug("IsDarkEnough", "Lux: $lux <= Threshold: $threshold ? " . ($isDark ? "YES" : "NO"), 0);
             return $isDark;
