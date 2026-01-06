@@ -1,0 +1,58 @@
+{
+    "elements": [
+        {
+            "type": "ValidationTextBox",
+            "name": "GroupTopic",
+            "caption": "Root Topic Prefix",
+            "default": "symcon"
+        },
+        {
+            "type": "List",
+            "name": "SyncItems",
+            "caption": "Synchronized Objects (Categories or Variables)",
+            "add": true,
+            "delete": true,
+            "columns": [
+                {
+                    "caption": "Object (Variable or Category)",
+                    "name": "ObjectID",
+                    "width": "350px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectObject"
+                    }
+                },
+                {
+                    "caption": "Topic Override (Optional)",
+                    "name": "CustomTopic",
+                    "width": "auto",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Label",
+            "caption": "If 'Topic Override' is empty, the name of the object (and its children) will be used to build the path."
+        },
+        {
+            "type": "CheckBox",
+            "name": "EnableSet",
+            "caption": "Enable '.../set' Command Topics (Bidirectional)",
+            "default": true
+        },
+        {
+            "type": "Label",
+            "caption": "Status updates are published to 'Prefix/Path'. Commands are received on 'Prefix/Path/set'."
+        }
+    ],
+    "actions": [
+        {
+            "type": "Button",
+            "caption": "Debug: Show Mapped Topics",
+            "onClick": "MQTTSync_DumpTopics($id);"
+        }
+    ]
+}

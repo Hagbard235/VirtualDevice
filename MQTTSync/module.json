@@ -1,0 +1,16 @@
+{
+    "id": "{9367D425-4523-4414-9988-1D7754593C79}",
+    "name": "MQTTSync",
+    "type": 3,
+    "vendor": "Custom",
+    "aliases": [
+        "MQTT Synchronizer",
+        "MQTT Tree Sync"
+    ],
+    "parentRequirements": [
+        "{F7A0DD2E-7684-95C0-64C2-D2A9DC47577B}"
+    ],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "MQTTSync"
+}
