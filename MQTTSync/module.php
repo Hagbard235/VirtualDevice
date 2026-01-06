@@ -11,8 +11,8 @@ class MQTTSync extends IPSModule {
         $this->RegisterPropertyString("SyncItems", "[]");
         $this->RegisterPropertyBoolean("EnableSet", true);
         
-        // Connect to parent (MQTT Client)
-        $this->ConnectParent("{F7A0DD2E-7684-95C0-64C2-D2A9DC47577B}");
+        // Connect to parent handled by RequireParent in module.json
+        // $this->ConnectParent("{F7A0DD2E-7684-95C0-64C2-D2A9DC47577B}");
         
         // Attributes for internal storage
         $this->RegisterAttributeString("RegisteredMessages", "[]");
