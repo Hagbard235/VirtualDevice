@@ -81,10 +81,8 @@ class BewegungsmelderProxy extends IPSModule {
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         
-        // Initialisierung ThresholdVar falls leer (z.B. nach Update)
-        if ($this->GetValue("ThresholdVar") == 0) {
-             $this->SetValue("ThresholdVar", $this->ReadPropertyInteger("Threshold"));
-        }
+        // Initialisierung ThresholdVar IMMER aus Property beim Übernehmen (User-Intent Konsole)
+        $this->SetValue("ThresholdVar", $this->ReadPropertyInteger("Threshold"));
 
         
         // Migration alter Properties
@@ -274,6 +272,8 @@ class BewegungsmelderProxy extends IPSModule {
                 break;
             case "ThresholdVar":
                 $this->SetValue("ThresholdVar", $Value);
+                // Sync to Property for Consistency (no ApplyChanges)
+                IPS_SetProperty($this->InstanceID, "Threshold", $Value);
                 break;
         }
     }
