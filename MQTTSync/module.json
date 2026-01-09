@@ -8,9 +8,9 @@
         "MQTT Tree Sync"
     ],
     "parentRequirements": [
-        "{F7A0DD2E-7684-95C0-64C2-D2A9DC47577B}",
-        "{EE0D345A-CF31-428A-A613-33CE98E752DD}",
-        "{C6D2AEB3-6E1F-4B2E-8E69-3A1A00246850}"
+        "{018EF6B5-AB94-40C6-AA53-46943E824ACF}",
+        "{043EA491-0325-4ADD-8C59-7D1B96546575}",
+        "{97475B04-67C3-A74D-C970-E9409B0EFA1D}"
     ],
     "childRequirements": [],
     "implemented": [
