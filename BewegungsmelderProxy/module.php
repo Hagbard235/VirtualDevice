@@ -34,6 +34,10 @@ class BewegungsmelderProxy extends IPSModule {
         // 2. Attribute (Interner Speicher für den "letzten Modus")
         $this->RegisterAttributeInteger("SavedMode", self::MODE_AUTO_LUX);
 
+        // Merker, ob die Automatik im laufenden Nachlauf-Zyklus eingeschaltet hat.
+        // Nur dann darf die Helligkeitsprüfung übersprungen werden (siehe CheckLogic).
+        $this->RegisterAttributeBoolean("AutoCycleActive", false);
+
         // 3. Profil erstellen
         if (!IPS_VariableProfileExists("BWM.Mode")) {
             IPS_CreateVariableProfile("BWM.Mode", 1);
@@ -124,6 +128,19 @@ class BewegungsmelderProxy extends IPSModule {
         if ($btnOnID > 0) $this->RegisterMessage($btnOnID, VM_UPDATE);
         if ($btnOffID > 0) $this->RegisterMessage($btnOffID, VM_UPDATE);
         if ($btnAutoID > 0) $this->RegisterMessage($btnAutoID, VM_UPDATE);
+
+        // Status aus dem tatsächlichen Gerätezustand synchronisieren.
+        // Nach einem IPS-Neustart stellt Symcon den zuletzt gespeicherten Wert wieder her,
+        // der nicht zwingend zum echten Licht passt. Ein stehengebliebenes "AN" würde in
+        // CheckLogic die Helligkeitsprüfung überbrücken.
+        if ($lightID > 0 && IPS_VariableExists($lightID)) {
+            $actualState = GetValueBoolean($lightID);
+            if ($this->GetValue("Status") !== $actualState) {
+                $this->SendDebug("ApplyChanges", "Status war desynchron. Korrigiert auf " . ($actualState ? "TRUE" : "FALSE"), 0);
+            }
+            $this->SetValue("Status", $actualState);
+        }
+        $this->WriteAttributeBoolean("AutoCycleActive", false);
 
         // Helper Scripte (An/Aus) anlegen oder aktualisieren
         $this->CreateHelperScripts();
@@ -258,12 +275,16 @@ class BewegungsmelderProxy extends IPSModule {
                 $this->SwitchLight($Value);
                 if ($Value) {
                     // Manuell AN -> Timer starten (simuliert Bewegung)
+                    // Zyklus als aktiv markieren, damit Bewegung den Nachlauf verlängern
+                    // kann, ohne an der Helligkeitsprüfung zu scheitern.
                     $duration = $this->ReadPropertyInteger("Duration") * 1000;
                     $this->SendDebug("Manual", "Switched ON manually. Starting Timer: " . ($duration/1000) . "s", 0);
+                    $this->WriteAttributeBoolean("AutoCycleActive", true);
                     $this->SetTimerInterval("AutoOffTimer", $duration);
                 } else {
                     // Manuell AUS -> Timer stoppen
                     $this->SendDebug("Manual", "Switched OFF manually. Stopping Timer.", 0);
+                    $this->WriteAttributeBoolean("AutoCycleActive", false);
                     $this->SetTimerInterval("AutoOffTimer", 0);
                 }
                 break;
@@ -289,7 +310,11 @@ class BewegungsmelderProxy extends IPSModule {
     private function ChangeMode($newMode) {
         $this->SendDebug("Mode", "Changing Mode to: " . $newMode, 0);
         $this->SetValue("Mode", $newMode);
-        
+
+        // Moduswechsel beendet den laufenden Automatik-Zyklus. CheckLogic weiter unten
+        // setzt das Flag bei Bedarf neu.
+        $this->WriteAttributeBoolean("AutoCycleActive", false);
+
         // Sofortige Reaktion auf Moduswechsel
         if ($newMode == self::MODE_ALWAYS_ON) {
             $this->SwitchLight(true);
@@ -325,16 +350,19 @@ class BewegungsmelderProxy extends IPSModule {
         if ($mode == self::MODE_AUTO_NOLUX) {
             $shouldSwitch = true;
         } elseif ($mode == self::MODE_AUTO_LUX) {
-            // Wenn es dunkel genug ist ODER das Licht bereits an ist (dann ist es ja hell wegen uns),
-            // dann soll nachgetriggert werden.
+            // Wenn es dunkel genug ist ODER die Automatik in diesem Zyklus bereits
+            // eingeschaltet hat (dann ist es ja hell wegen uns), soll nachgetriggert werden.
+            // Bewusst NICHT die Status-Variable: die kann vom echten Gerät abweichen und
+            // würde die Helligkeitsprüfung dann dauerhaft aushebeln.
             // CheckLogic berücksichtigt jetzt den Trigger-Sensor für lokale Helligkeit
-            if ($this->IsDarkEnough($triggerSensorID) || $this->GetValue("Status")) {
+            if ($this->IsDarkEnough($triggerSensorID) || $this->ReadAttributeBoolean("AutoCycleActive")) {
                 $shouldSwitch = true;
             }
         }
 
         if ($shouldSwitch) {
             $this->SwitchLight(true);
+            $this->WriteAttributeBoolean("AutoCycleActive", true);
             $duration = $this->ReadPropertyInteger("Duration") * 1000;
             $this->SendDebug("Logic", "Switching ON (or extending). Timer set to " . ($duration/1000) . "s", 0);
             $this->SetTimerInterval("AutoOffTimer", $duration);
@@ -440,6 +468,9 @@ class BewegungsmelderProxy extends IPSModule {
         if ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX) {
             $this->SwitchLight(false);
         }
+        // Zyklus ist beendet - der nächste Trigger muss die Helligkeit wieder prüfen.
+        // Auch in den Dauer-Modi zurücksetzen, damit kein Flag stehenbleibt.
+        $this->WriteAttributeBoolean("AutoCycleActive", false);
         $this->SetTimerInterval("AutoOffTimer", 0);
     }
 
