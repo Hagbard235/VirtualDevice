@@ -73,8 +73,13 @@
     {
       "type": "NumberSpinner",
       "name": "Threshold",
-      "caption": "Schaltschwelle (Lux)",
-      "suffix": "Lux"
+      "caption": "Schaltschwelle (Startwert)",
+      "suffix": "Lux",
+      "minimum": 0
+    },
+    {
+      "type": "Label",
+      "caption": "Hinweis: Der laufende Wert steht in der Variable 'Schaltschwelle' und kann dort im Webfront geändert werden. Dieses Feld überschreibt ihn nur, wenn es hier geändert wird."
     },
     {
       "type": "SelectVariable",

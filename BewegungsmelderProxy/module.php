@@ -40,6 +40,11 @@ class BewegungsmelderProxy extends IPSModule {
         // Nur dann darf die Helligkeitsprüfung übersprungen werden (siehe CheckLogic).
         $this->RegisterAttributeBoolean("AutoCycleActive", false);
 
+        // Zuletzt aus der Konsole übernommener Schwellenwert. Dient in ApplyChanges dazu,
+        // eine Änderung in der Instanz-Konfiguration von einem unveränderten Übernehmen
+        // zu unterscheiden. -1 bedeutet "noch nie übernommen".
+        $this->RegisterAttributeInteger("LastAppliedThreshold", -1);
+
         // 3. Profil erstellen
         if (!IPS_VariableProfileExists("BWM.Mode")) {
             IPS_CreateVariableProfile("BWM.Mode", 1);
@@ -50,11 +55,20 @@ class BewegungsmelderProxy extends IPSModule {
             IPS_SetVariableProfileIcon("BWM.Mode", "Gear");
         }
 
+        // Profil für die Schaltschwelle, damit das Webfront ein sinnvolles Eingabefeld
+        // mit Einheit und Untergrenze anbietet.
+        if (!IPS_VariableProfileExists("BWM.Lux")) {
+            IPS_CreateVariableProfile("BWM.Lux", 1);
+            IPS_SetVariableProfileText("BWM.Lux", "", " Lux");
+            IPS_SetVariableProfileValues("BWM.Lux", 0, 100000, 1);
+            IPS_SetVariableProfileIcon("BWM.Lux", "Sun");
+        }
+
         // 4. Status-Variablen registrieren
         $this->RegisterVariableBoolean("Status", "Licht Status", "~Switch", 10);
         $this->RegisterVariableBoolean("Motion", "Bewegung", "~Motion", 20);
         $this->RegisterVariableInteger("Brightness", "Helligkeit", "~Illumination", 30);
-        $this->RegisterVariableInteger("ThresholdVar", "Schaltschwelle", "", 35);
+        $this->RegisterVariableInteger("ThresholdVar", "Schaltschwelle", "BWM.Lux", 35);
         $this->EnableAction("ThresholdVar");
         
         $this->RegisterVariableInteger("Mode", "Modus", "BWM.Mode", 0);
@@ -88,10 +102,18 @@ class BewegungsmelderProxy extends IPSModule {
         $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
         $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
         
-        // Initialisierung ThresholdVar IMMER aus Property beim Übernehmen (User-Intent Konsole)
-        $this->SetValue("ThresholdVar", $this->ReadPropertyInteger("Threshold"));
+        // Schaltschwelle: zur Laufzeit ist die Variable die einzige Wahrheit, die Property
+        // liefert nur den Startwert. Die Variable wird deshalb nur dann überschrieben,
+        // wenn sich der Wert in der Instanz-Konfiguration tatsächlich geändert hat -
+        // sonst würde jedes Übernehmen eine im Webfront gesetzte Schwelle verwerfen.
+        $thresholdProp = $this->ReadPropertyInteger("Threshold");
+        if ($thresholdProp !== $this->ReadAttributeInteger("LastAppliedThreshold")) {
+            $this->SendDebug("Threshold", "Konsolenwert geändert -> Schaltschwelle auf $thresholdProp gesetzt", 0);
+            $this->SetValue("ThresholdVar", $thresholdProp);
+            $this->WriteAttributeInteger("LastAppliedThreshold", $thresholdProp);
+        }
 
-        
+
         // Migration alter Properties
         $oldTop = $this->ReadPropertyInteger("ButtonTopID");
         if ($oldTop > 0) {
@@ -311,9 +333,11 @@ class BewegungsmelderProxy extends IPSModule {
                 $this->ChangeMode($Value);
                 break;
             case "ThresholdVar":
+                // Bewusst kein IPS_SetProperty: das wuerde die Instanz als "geaendert"
+                // markieren, und ein IPS_ApplyChanges zum Uebernehmen wuerde die Instanz
+                // neu laden und dabei den laufenden AutoOffTimer verwerfen.
+                $this->SendDebug("Threshold", "Schaltschwelle über Webfront auf $Value gesetzt", 0);
                 $this->SetValue("ThresholdVar", $Value);
-                // Sync to Property for Consistency (no ApplyChanges)
-                IPS_SetProperty($this->InstanceID, "Threshold", $Value);
                 break;
         }
     }
@@ -393,9 +417,10 @@ class BewegungsmelderProxy extends IPSModule {
     private function IsDarkEnough($triggerSensorID = 0) {
         $this->SendDebug("IsDarkEnough", "Checking if it's dark enough. Trigger: $triggerSensorID", 0);
         
-        // Helper: Ermittle aktuellen Threshold (Variable hat Vorrang vor Property)
+        // Schaltschwelle kommt ausschliesslich aus der Variable. Kein Fallback auf die
+        // Property: sonst waere 0 ("nur bei absoluter Dunkelheit schalten") nicht
+        // einstellbar, weil es als "nicht gesetzt" gelesen wuerde.
         $threshold = $this->GetValue("ThresholdVar");
-        if ($threshold == 0) $threshold = $this->ReadPropertyInteger("Threshold"); // Fallback
         
         // 0. Sonderprüfung für Trigger-Sensor (Zone)
         if ($triggerSensorID > 0) {
