@@ -8,7 +8,9 @@ class BewegungsmelderProxy extends IPSModule {
     const MODE_ALWAYS_OFF = 2;
     const MODE_AUTO_NOLUX = 3;
 
-    private $lastSwitchTimestamp = 0;
+    // Zeitfenster, in dem nach einem Schaltbefehl auf die Rückmeldung des Geräts
+    // gewartet wird. MQTT- und Eltako-Aktoren brauchen rund eine Sekunde.
+    const SWITCH_TIMEOUT = 5.0;
 
     public function Create() {
         parent::Create();
@@ -64,6 +66,7 @@ class BewegungsmelderProxy extends IPSModule {
 
         // 6. Timer registrieren
         $this->RegisterTimer("AutoOffTimer", 0, 'BWMProxy_TimerEvent($_IPS[\'TARGET\']);');
+        $this->RegisterTimer("VerifyTimer", 0, 'BWMProxy_VerifySwitch($_IPS[\'TARGET\']);');
     }
 
     public function ApplyChanges() {
@@ -141,6 +144,8 @@ class BewegungsmelderProxy extends IPSModule {
             $this->SetValue("Status", $actualState);
         }
         $this->WriteAttributeBoolean("AutoCycleActive", false);
+        $this->SetBuffer("PendingSwitch", "");
+        $this->SetTimerInterval("VerifyTimer", 0);
 
         // Helper Scripte (An/Aus) anlegen oder aktualisieren
         $this->CreateHelperScripts();
@@ -246,11 +251,25 @@ class BewegungsmelderProxy extends IPSModule {
                 $this->CheckLogic($linkedMotionID);
             }
         } elseif ($SenderID == $lightID) {
-            // Debounce: Wenn wir gerade erst geschaltet haben, ignorieren wir Echos
-            if ((microtime(true) - $this->lastSwitchTimestamp) < 3.0) {
-                 $this->SendDebug("MessageSink", "Ignoring Status Event from Light (Debounce active)", 0);
+            // Die Rückmeldung des Geräts ist die verbindliche Quelle für "Status".
+            // Solange die Schaltverzögerung läuft, akzeptieren wir aber nur die
+            // Bestätigung des gewünschten Zustands - ein widersprechendes Echo ist in
+            // diesem Fenster veraltet (z.B. retained MQTT-Topic) und würde Status
+            // fälschlich zurückwerfen.
+            // Der Merker liegt im Buffer, da Instanz-Properties zwischen zwei
+            // MessageSink-Aufrufen nicht erhalten bleiben.
+            $pending = json_decode($this->GetBuffer("PendingSwitch"), true);
+            $isPending = is_array($pending) && (microtime(true) - $pending['ts']) < self::SWITCH_TIMEOUT;
+
+            if ($isPending && $value !== $pending['state']) {
+                $this->SendDebug("MessageSink", "Veraltetes Echo von Licht $lightID verworfen (erwartet: " . ($pending['state'] ? "TRUE" : "FALSE") . ", erhalten: " . ($value ? "TRUE" : "FALSE") . ")", 0);
             } else {
-                 $this->SetValue("Status", $value);
+                if ($isPending) {
+                    $this->SendDebug("MessageSink", "Schaltvorgang von Gerät $lightID bestätigt: " . ($value ? "TRUE" : "FALSE"), 0);
+                    $this->SetBuffer("PendingSwitch", "");
+                    $this->SetTimerInterval("VerifyTimer", 0); // Nachkontrolle nicht mehr nötig
+                }
+                $this->SetValue("Status", $value);
             }
         } elseif ($SenderID == $luxID || $SenderID == $extDarkID || $isLocalBrightnessSender) {
              if ($SenderID == $luxID) {
@@ -430,21 +449,29 @@ class BewegungsmelderProxy extends IPSModule {
 
     private function SwitchLight($state) {
         $targetID = $this->ReadPropertyInteger("TargetLightID");
-        if ($targetID > 0 && IPS_VariableExists($targetID)) {            
+        if ($targetID > 0 && IPS_VariableExists($targetID)) {
             // Traffic-Optimierung: Nur schalten, wenn Zustand abweicht
             $currentState = GetValueBoolean($targetID);
-            
-            // Wenn wir schalten, merken wir uns den Zeitpunkt, um einkommende "falsche" Echos 
-            // vom Hilfsskript für kurze Zeit zu ignorieren.
-            $this->lastSwitchTimestamp = microtime(true);
 
             if ($currentState !== $state) {
                 $this->SendDebug("SwitchLight", "Setting Device $targetID to " . ($state ? "TRUE" : "FALSE"), 0);
+
+                // Gewünschten Zustand samt Zeitpunkt hinterlegen. Solange die
+                // Schaltverzögerung läuft, dient das dem MessageSink zur Unterscheidung
+                // von Bestätigung und veraltetem Echo.
+                $this->SetBuffer("PendingSwitch", json_encode(['state' => $state, 'ts' => microtime(true)]));
+
+                // Nachkontrolle anstoßen, falls die Rückmeldung ausbleibt.
+                $this->SetTimerInterval("VerifyTimer", (int)(self::SWITCH_TIMEOUT * 1000));
+
                 @RequestAction($targetID, $state);
             } else {
                 //$this->SendDebug("SwitchLight", "Device $targetID is already " . ($state ? "TRUE" : "FALSE") . ". Skipping.", 0);
             }
-            // Interne Variable immer synchron halten
+
+            // Status vorläufig auf den Wunschzustand setzen. Zurücklesen bringt hier nichts:
+            // das Gerät (MQTT/Eltako) braucht bis zu einer Sekunde. Die verbindliche
+            // Korrektur kommt aus der Rückmeldung im MessageSink.
             $this->SetValue("Status", $state);
         } else {
             $this->SendDebug("SwitchLight", "No TargetLightID configured or variable does not exist. Cannot switch light.", 0);
@@ -472,6 +499,43 @@ class BewegungsmelderProxy extends IPSModule {
         // Auch in den Dauer-Modi zurücksetzen, damit kein Flag stehenbleibt.
         $this->WriteAttributeBoolean("AutoCycleActive", false);
         $this->SetTimerInterval("AutoOffTimer", 0);
+    }
+
+    /**
+     * Nachkontrolle nach einem Schaltbefehl.
+     * Läuft nur an, wenn innerhalb von SWITCH_TIMEOUT keine Rückmeldung kam.
+     */
+    public function VerifySwitch() {
+        $this->SetTimerInterval("VerifyTimer", 0);
+
+        $pending = json_decode($this->GetBuffer("PendingSwitch"), true);
+        if (!is_array($pending)) {
+            // Rückmeldung war schon da und wurde im MessageSink verarbeitet.
+            return;
+        }
+        $this->SetBuffer("PendingSwitch", "");
+
+        $targetID = $this->ReadPropertyInteger("TargetLightID");
+        if ($targetID <= 0 || !IPS_VariableExists($targetID)) return;
+
+        $wanted = $pending['state'];
+        $actualState = GetValueBoolean($targetID);
+
+        if ($actualState === $wanted) {
+            // Gerät hat geschaltet, nur ohne dass uns eine Meldung erreicht hat.
+            $this->SendDebug("Verify", "Gerät $targetID steht auf " . ($actualState ? "TRUE" : "FALSE") . " - Rückmeldung blieb aus, Zustand stimmt.", 0);
+        } else {
+            $this->SendDebug("Verify", "WARNUNG: Gerät $targetID hat den Schaltbefehl nicht übernommen. Gewollt: " . ($wanted ? "TRUE" : "FALSE") . ", tatsächlich: " . ($actualState ? "TRUE" : "FALSE"), 0);
+
+            // Wenn das Einschalten fehlschlug, darf kein Automatik-Zyklus laufen -
+            // sonst würde die Helligkeitsprüfung beim nächsten Trigger übersprungen,
+            // obwohl gar kein Licht brennt.
+            if ($wanted === true) {
+                $this->WriteAttributeBoolean("AutoCycleActive", false);
+            }
+        }
+
+        $this->SetValue("Status", $actualState);
     }
 
     private function GetMotionState() {
