@@ -1,0 +1,15 @@
+{
+    "id": "{249FF3EC-9C95-4EA2-8D33-582519847AC1}",
+    "name": "KuehlschrankPV",
+    "type": 3,
+    "vendor": "Custom",
+    "aliases":
+    [
+        "Kuehlschrank PV-Optimierung",
+        "PV Kuehlschrank"
+    ],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "PVKS"
+}

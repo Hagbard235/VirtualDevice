@@ -16,6 +16,11 @@ ein Fehler gemeldet.
 
 Weitere Beschreibungen in den einzelnen Modulen.
 
+Neben den virtuellen Geräten enthält die Bibliothek Module, die auf denselben Instanzen aufsetzen:
+* **BewegungsmelderProxy** - Lichtsteuerung über einen oder mehrere Bewegungsmelder mit Helligkeitsauswertung
+* **MQTTSync** - spiegelt Objektbäume auf MQTT-Topics und zurück
+* **KuehlschrankPV** - verschiebt den Stromverbrauch eines Kühlschranks in die Erzeugungszeit der PV-Anlage (siehe [KuehlschrankPV/README.md](KuehlschrankPV/README.md))
+
 Prinzip der Verwendung:
 Die "realen" Aktoren werden angelegt an einem zentralen Ort. Hier ist der Aufbau relativ egal, ich empfehle aber eine Sortierung
 die der realen Physik entspricht, z.B.

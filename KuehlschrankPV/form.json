@@ -1,0 +1,327 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Der Kuehlschrank regelt seine Temperatur weiterhin selbst. Dieses Modul schaltet nur die Stromzufuhr. Stellen Sie den Thermostat des Geraets deshalb auf die unten eingetragene Tiefsttemperatur ein."
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Hardware",
+      "expanded": true,
+      "items": [
+        {
+          "type": "SelectVariable",
+          "name": "PowerSwitchID",
+          "caption": "Stromzufuhr (schaltbare Boolean-Variable)",
+          "width": "600px"
+        },
+        {
+          "type": "CheckBox",
+          "name": "InvertSwitch",
+          "caption": "Invertiert (True = Kuehlschrank AUS)"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "ConsumptionID",
+          "caption": "Stromverbrauch Kuehlschrank (W)",
+          "width": "600px"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "MeterID",
+          "caption": "Gesamtstromzaehler (W)",
+          "width": "600px"
+        },
+        {
+          "type": "CheckBox",
+          "name": "MeterFeedInNegative",
+          "caption": "Einspeisung wird negativ gezaehlt"
+        },
+        {
+          "type": "CheckBox",
+          "name": "MeterIncludesFridge",
+          "caption": "Der Kuehlschrank wird vom Gesamtzaehler mit erfasst"
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Eisfach",
+      "expanded": true,
+      "items": [
+        {
+          "type": "CheckBox",
+          "name": "FreezerEnabled",
+          "caption": "Eisfach ueberwachen"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "TempFreezerID",
+          "caption": "Temperatur Eisfach",
+          "width": "600px"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FreezerTempMin",
+          "caption": "Tiefsttemperatur (Puffer geladen)",
+          "suffix": "Grad",
+          "digits": 1,
+          "minimum": -40,
+          "maximum": 30
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FreezerTempTarget",
+          "caption": "Solltemperatur (Ziel der Netz-Nachkuehlung)",
+          "suffix": "Grad",
+          "digits": 1,
+          "minimum": -40,
+          "maximum": 30
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FreezerTempMax",
+          "caption": "Grenztemperatur (loest Netz-Nachkuehlung aus)",
+          "suffix": "Grad",
+          "digits": 1,
+          "minimum": -40,
+          "maximum": 30
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Kuehlfach",
+      "expanded": true,
+      "items": [
+        {
+          "type": "CheckBox",
+          "name": "FridgeEnabled",
+          "caption": "Kuehlfach ueberwachen"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "TempFridgeID",
+          "caption": "Temperatur Kuehlfach",
+          "width": "600px"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FridgeTempMin",
+          "caption": "Tiefsttemperatur (Puffer geladen)",
+          "suffix": "Grad",
+          "digits": 1,
+          "minimum": -40,
+          "maximum": 30
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FridgeTempTarget",
+          "caption": "Solltemperatur (Ziel der Netz-Nachkuehlung)",
+          "suffix": "Grad",
+          "digits": 1,
+          "minimum": -40,
+          "maximum": 30
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FridgeTempMax",
+          "caption": "Grenztemperatur (loest Netz-Nachkuehlung aus)",
+          "suffix": "Grad",
+          "digits": 1,
+          "minimum": -40,
+          "maximum": 30
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "PV-Ueberschuss",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Eingeschaltet wird, sobald der Ueberschuss die Leistungsaufnahme des Kuehlschranks plus den Aufschlag deckt. Die Leistungsaufnahme wird im Betrieb gelernt."
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SurplusThreshold",
+          "caption": "Aufschlag auf die Leistungsaufnahme",
+          "suffix": "W",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SurplusHysteresis",
+          "caption": "Hysterese (Toleranz im laufenden Betrieb)",
+          "suffix": "W",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SurplusStableSeconds",
+          "caption": "Mindestdauer einer Aenderung (Wolkenfilter)",
+          "suffix": "Sekunden",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "FridgePowerEstimate",
+          "caption": "Leistungsaufnahme (Startwert, bis gelernt)",
+          "suffix": "W",
+          "minimum": 1
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Prognose",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Das Modul zeichnet taeglich auf, wann genug Ueberschuss verfuegbar war, und leitet daraus den naechsten PV-Start und das naechste PV-Ende ab. Bis genug Tage aufgezeichnet sind, gelten die Standardzeiten."
+        },
+        {
+          "type": "SelectVariable",
+          "name": "PVForecastStartID",
+          "caption": "Externe Prognose PV-Start (Unix-Zeitstempel, optional)",
+          "width": "600px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "DefaultPVStart",
+          "caption": "Standard PV-Start (HH:MM)",
+          "width": "120px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "DefaultPVEnd",
+          "caption": "Standard PV-Ende (HH:MM)",
+          "width": "120px"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "LearnDays",
+          "caption": "Aufgezeichnete Tage",
+          "suffix": "Tage",
+          "minimum": 1,
+          "maximum": 60
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "PreCoolMinutes",
+          "caption": "Vorkuehlfenster vor PV-Ende",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "PreCoolMaxGridW",
+          "caption": "Im Vorkuehlfenster erlaubter Netzbezug",
+          "suffix": "W",
+          "minimum": 0
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Schutz und Zeiten",
+      "items": [
+        {
+          "type": "NumberSpinner",
+          "name": "MinOffMinutes",
+          "caption": "Mindestpause vor dem Wiedereinschalten (Verdichterschutz)",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "MinOnMinutes",
+          "caption": "Mindestlaufzeit vor dem Abschalten",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "MaxOffMinutes",
+          "caption": "Maximale Aus-Zeit, danach Zwangskuehlung (0 = kein Limit)",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SensorTimeoutMinutes",
+          "caption": "Sensor gilt als ausgefallen nach (0 = keine Pruefung)",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "CheckInterval",
+          "caption": "Pruefintervall",
+          "suffix": "Sekunden",
+          "minimum": 10
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "DefaultDriftFreezer",
+          "caption": "Erwaermung Eisfach (Startwert, bis gelernt)",
+          "suffix": "Grad/h",
+          "digits": 2,
+          "minimum": 0.05
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "DefaultDriftFridge",
+          "caption": "Erwaermung Kuehlfach (Startwert, bis gelernt)",
+          "suffix": "Grad/h",
+          "digits": 2,
+          "minimum": 0.05
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Button",
+      "caption": "Jetzt neu bewerten",
+      "onClick": "PVKS_Cycle($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Lern- und Prognosewerte anzeigen",
+      "onClick": "PVKS_DumpState($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Lernwerte zuruecksetzen",
+      "onClick": "PVKS_ResetLearning($id);"
+    }
+  ],
+  "status": [
+    {
+      "code": 102,
+      "icon": "active",
+      "caption": "Aktiv"
+    },
+    {
+      "code": 104,
+      "icon": "inactive",
+      "caption": "Instanz ist inaktiv"
+    },
+    {
+      "code": 201,
+      "icon": "error",
+      "caption": "Konfiguration unvollstaendig"
+    },
+    {
+      "code": 202,
+      "icon": "error",
+      "caption": "Temperaturwerte fehlen oder sind unplausibel - Notbetrieb, Kuehlschrank bleibt am Netz"
+    },
+    {
+      "code": 203,
+      "icon": "error",
+      "caption": "Die Steckdose uebernimmt den Schaltbefehl nicht"
+    }
+  ]
+}
