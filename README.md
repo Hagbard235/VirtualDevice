@@ -20,6 +20,8 @@ Neben den virtuellen Geräten enthält die Bibliothek Module, die auf denselben 
 * **BewegungsmelderProxy** - Lichtsteuerung über einen oder mehrere Bewegungsmelder mit Helligkeitsauswertung
 * **MQTTSync** - spiegelt Objektbäume auf MQTT-Topics und zurück
 * **KuehlschrankPV** - verschiebt den Stromverbrauch eines Kühlschranks in die Erzeugungszeit der PV-Anlage (siehe [KuehlschrankPV/README.md](KuehlschrankPV/README.md))
+* **ToDoZentrale** - verwaltet offene Aufgaben, stellt sie im Webfront dar, erinnert daran und sagt sie an (siehe [ToDoZentrale/README.md](ToDoZentrale/README.md))
+* **GeraetLauf** - erkennt am Stromverbrauch, ob ein Haushaltsgerät läuft oder fertig ist, und meldet Aufgaben an die ToDoZentrale (siehe [GeraetLauf/README.md](GeraetLauf/README.md))
 
 Prinzip der Verwendung:
 Die "realen" Aktoren werden angelegt an einem zentralen Ort. Hier ist der Aufbau relativ egal, ich empfehle aber eine Sortierung

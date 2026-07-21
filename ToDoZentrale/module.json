@@ -1,0 +1,16 @@
+{
+    "id": "{29C6B904-9E76-4E8B-B152-0A315FEC3D67}",
+    "name": "ToDoZentrale",
+    "type": 3,
+    "vendor": "Custom",
+    "aliases":
+    [
+        "ToDo",
+        "Aufgabenliste",
+        "ToDo Zentrale"
+    ],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "TODO"
+}

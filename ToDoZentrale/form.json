@@ -1,0 +1,228 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Verwaltet offene Aufgaben als Liste und stellt sie im Webfront dar. Andere Module und Skripte legen Aufgaben ueber TODO_Set an; erledigt werden sie durch Antippen oder durch eine Bedingung."
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Kategorien",
+      "expanded": true,
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Jede Kategorie bestimmt, wo ihre Kacheln im Objektbaum erscheinen und wie sie aussehen. Der Schluessel wird beim Anlegen einer Aufgabe angegeben."
+        },
+        {
+          "type": "List",
+          "name": "Categories",
+          "caption": "Kategorien",
+          "rowCount": 6,
+          "add": true,
+          "delete": true,
+          "columns": [
+            {
+              "caption": "Schluessel",
+              "name": "Key",
+              "width": "150px",
+              "add": "",
+              "edit": { "type": "ValidationTextBox" }
+            },
+            {
+              "caption": "Bezeichnung",
+              "name": "Name",
+              "width": "200px",
+              "add": "",
+              "edit": { "type": "ValidationTextBox" }
+            },
+            {
+              "caption": "Ort der Kacheln",
+              "name": "ParentID",
+              "width": "300px",
+              "add": 0,
+              "edit": { "type": "SelectCategory" }
+            },
+            {
+              "caption": "Farbe",
+              "name": "Color",
+              "width": "120px",
+              "add": "",
+              "edit": { "type": "ValidationTextBox" }
+            },
+            {
+              "caption": "Icon",
+              "name": "Icon",
+              "width": "120px",
+              "add": "",
+              "edit": { "type": "SelectIcon" }
+            }
+          ]
+        },
+        {
+          "type": "SelectCategory",
+          "name": "DefaultParentID",
+          "caption": "Ort fuer Aufgaben ohne Kategorie",
+          "width": "600px"
+        },
+        {
+          "type": "Label",
+          "caption": "Farbe entweder als Klartext (ROT, GELB, GRUEN, BLAU, ORANGE, GRAU) oder als Hexwert (#FF8800). Bleibt sie leer, faerbt die Prioritaet der Aufgabe."
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Sprachausgabe",
+      "expanded": true,
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Ziele fuer gesprochene Ansagen. Ein Skript wird mit den Parametern 'Titel' und 'Text' aufgerufen; alternativ kann der Text per RequestAction in eine Variable geschrieben werden."
+        },
+        {
+          "type": "List",
+          "name": "VoiceTargets",
+          "caption": "Sprachziele",
+          "rowCount": 5,
+          "add": true,
+          "delete": true,
+          "columns": [
+            {
+              "caption": "Schluessel",
+              "name": "Key",
+              "width": "130px",
+              "add": "",
+              "edit": { "type": "ValidationTextBox" }
+            },
+            {
+              "caption": "Titel der Ansage",
+              "name": "Title",
+              "width": "180px",
+              "add": "Hinweis",
+              "edit": { "type": "ValidationTextBox" }
+            },
+            {
+              "caption": "Skript",
+              "name": "ScriptID",
+              "width": "250px",
+              "add": 0,
+              "edit": { "type": "SelectScript" }
+            },
+            {
+              "caption": "oder Variable",
+              "name": "VariableID",
+              "width": "250px",
+              "add": 0,
+              "edit": { "type": "SelectVariable" }
+            },
+            {
+              "caption": "Aktiv",
+              "name": "Enabled",
+              "width": "80px",
+              "add": true,
+              "edit": { "type": "CheckBox" }
+            }
+          ]
+        },
+        {
+          "type": "CheckBox",
+          "name": "QuietEnabled",
+          "caption": "Ruhezeit beachten (in der Ruhezeit wird nichts gesprochen)"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "QuietStart",
+          "caption": "Ruhezeit von (HH:MM)",
+          "width": "120px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "QuietEnd",
+          "caption": "Ruhezeit bis (HH:MM)",
+          "width": "120px"
+        },
+        {
+          "type": "Select",
+          "name": "VoiceMinPriority",
+          "caption": "Ab welcher Prioritaet gesprochen wird",
+          "options": [
+            { "caption": "Alles sprechen", "value": 0 },
+            { "caption": "Ab Normal", "value": 1 },
+            { "caption": "Ab Wichtig", "value": 2 },
+            { "caption": "Nur Kritisch", "value": 3 }
+          ]
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SummaryThreshold",
+          "caption": "Ab so vielen gleichzeitigen Erinnerungen zusammenfassen (0 = nie)",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "RepeatSuppressSeconds",
+          "caption": "Gleichen Satz nicht erneut sprechen innerhalb von",
+          "suffix": "Sekunden",
+          "minimum": 0
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Sonstiges",
+      "items": [
+        {
+          "type": "NumberSpinner",
+          "name": "CheckInterval",
+          "caption": "Pruefintervall",
+          "suffix": "Sekunden",
+          "minimum": 10
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Button",
+      "caption": "Jetzt pruefen",
+      "onClick": "TODO_Cycle($id);"
+    },
+    {
+      "type": "Label",
+      "caption": "Migration vom bisherigen Skript-System:"
+    },
+    {
+      "type": "RowLayout",
+      "items": [
+        {
+          "type": "SelectCategory",
+          "name": "AdoptCategory",
+          "caption": "Bestehende ToDo-Kategorie",
+          "width": "400px"
+        },
+        {
+          "type": "Button",
+          "caption": "Vorhandene Kacheln uebernehmen",
+          "onClick": "TODO_AdoptLegacy($id, $AdoptCategory);"
+        }
+      ]
+    },
+    {
+      "type": "Button",
+      "caption": "Verwaiste ToDo-Profile aufraeumen",
+      "onClick": "TODO_CleanupProfiles($id);"
+    }
+  ],
+  "status": [
+    {
+      "code": 102,
+      "icon": "active",
+      "caption": "Aktiv"
+    },
+    {
+      "code": 104,
+      "icon": "inactive",
+      "caption": "Instanz ist inaktiv"
+    }
+  ]
+}

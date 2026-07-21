@@ -1,0 +1,269 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Erkennt am Stromverbrauch, ob das Geraet laeuft oder fertig ist, schaetzt die Restlaufzeit und meldet die Aufgaben an die ToDo-Zentrale. Eine Instanz je Geraet."
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "DeviceName",
+      "caption": "Bezeichnung des Geraets",
+      "width": "300px"
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Hardware",
+      "expanded": true,
+      "items": [
+        {
+          "type": "SelectVariable",
+          "name": "PowerID",
+          "caption": "Leistungsaufnahme (W)",
+          "width": "600px"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "DoorID",
+          "caption": "Tuerkontakt (optional)",
+          "width": "600px"
+        },
+        {
+          "type": "CheckBox",
+          "name": "DoorOpenWhenFalse",
+          "caption": "Tuer ist offen, wenn die Variable False ist (Zigbee-Kontakte melden meist True = geschlossen)"
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Erkennung",
+      "expanded": true,
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Umgeschaltet wird erst, wenn die Leistung die Schwelle durchgehend fuer die Haltezeit ueber- beziehungsweise unterschreitet. Damit koennen Einweichpausen kein Programmende vortaeuschen."
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "StartWatt",
+          "caption": "Startschwelle",
+          "suffix": "W",
+          "digits": 1,
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "StartHoldSeconds",
+          "caption": "Haltezeit fuer Start",
+          "suffix": "Sekunden",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "EndWatt",
+          "caption": "Endschwelle",
+          "suffix": "W",
+          "digits": 1,
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "EndHoldSeconds",
+          "caption": "Haltezeit fuer Ende",
+          "suffix": "Sekunden",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "MinRunMinutes",
+          "caption": "Mindestdauer, damit es als Programmlauf zaehlt",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "MinPeakWatt",
+          "caption": "Mindest-Spitzenleistung, damit es als Programmlauf zaehlt",
+          "suffix": "W",
+          "digits": 0,
+          "minimum": 0
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Restlaufzeit",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Grundlage ist die typische Dauer vergangener Laeufe (Median). Sobald genug Energie verbraucht wurde, fliesst der Energiefortschritt mit ein. Wird die Schleuderphase erkannt, gilt die kurze Restzeit."
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "DefaultRunMinutes",
+          "caption": "Angenommene Dauer, bis Laeufe gelernt sind",
+          "suffix": "Minuten",
+          "minimum": 1
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "LearnRuns",
+          "caption": "Aufgezeichnete Laeufe",
+          "minimum": 1,
+          "maximum": 100
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SpinWatt",
+          "caption": "Ab dieser Leistung in der zweiten Programmhaelfte gilt es als Schleudern (0 = aus)",
+          "suffix": "W",
+          "digits": 0,
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SpinRemainingMinutes",
+          "caption": "Restzeit nach erkanntem Schleudern",
+          "suffix": "Minuten",
+          "minimum": 0
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Aufgaben",
+      "expanded": true,
+      "items": [
+        {
+          "type": "SelectInstance",
+          "name": "ToDoInstanceID",
+          "caption": "ToDo-Zentrale",
+          "width": "600px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "Category",
+          "caption": "Kategorie-Schluessel (leer = Standardort)",
+          "width": "250px"
+        },
+        {
+          "type": "CheckBox",
+          "name": "ShowRunningTile",
+          "caption": "Waehrend des Laufs eine Kachel anzeigen"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "IdentRunning",
+          "caption": "Ident der Laeuft-Aufgabe",
+          "width": "250px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "TextRunning",
+          "caption": "Text der Laeuft-Aufgabe",
+          "width": "400px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "IdentDone",
+          "caption": "Ident der Fertig-Aufgabe",
+          "width": "250px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "TextDone",
+          "caption": "Text der Fertig-Aufgabe",
+          "width": "400px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "SpeechDone",
+          "caption": "Gesprochener Text",
+          "width": "400px"
+        },
+        {
+          "type": "Select",
+          "name": "DonePriority",
+          "caption": "Prioritaet der Fertig-Aufgabe",
+          "options": [
+            { "caption": "Niedrig", "value": 0 },
+            { "caption": "Normal", "value": 1 },
+            { "caption": "Wichtig", "value": 2 },
+            { "caption": "Kritisch", "value": 3 }
+          ]
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "RemindMinutes",
+          "caption": "Erinnerungsintervall (0 = keine Erinnerung)",
+          "suffix": "Minuten",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "RemindMax",
+          "caption": "Maximale Anzahl Erinnerungen (0 = unbegrenzt)",
+          "minimum": 0
+        },
+        {
+          "type": "SelectVariable",
+          "name": "SuppressVarID",
+          "caption": "Erinnerung unterdruecken, solange diese Variable gilt (z.B. Trockner laeuft)",
+          "width": "600px"
+        },
+        {
+          "type": "CheckBox",
+          "name": "SuppressWhenTrue",
+          "caption": "Unterdruecken, wenn die Variable True ist"
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Sonstiges",
+      "items": [
+        {
+          "type": "NumberSpinner",
+          "name": "CheckInterval",
+          "caption": "Pruefintervall",
+          "suffix": "Sekunden",
+          "minimum": 10
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Button",
+      "caption": "Jetzt pruefen",
+      "onClick": "GLF_Cycle($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Aufgezeichnete Laeufe anzeigen",
+      "onClick": "GLF_DumpHistory($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Gelernte Laufzeiten zuruecksetzen",
+      "onClick": "GLF_ResetLearning($id);"
+    }
+  ],
+  "status": [
+    {
+      "code": 102,
+      "icon": "active",
+      "caption": "Aktiv"
+    },
+    {
+      "code": 104,
+      "icon": "inactive",
+      "caption": "Instanz ist inaktiv"
+    },
+    {
+      "code": 201,
+      "icon": "error",
+      "caption": "Keine Leistungsvariable konfiguriert"
+    }
+  ]
+}

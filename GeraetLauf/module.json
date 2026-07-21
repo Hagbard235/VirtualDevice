@@ -1,0 +1,17 @@
+{
+    "id": "{58D07664-8195-4A3F-9E43-7E321BA2079D}",
+    "name": "GeraetLauf",
+    "type": 3,
+    "vendor": "Custom",
+    "aliases":
+    [
+        "Geraetelauf",
+        "Waschmaschine",
+        "Trockner",
+        "Laufzeiterkennung"
+    ],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "GLF"
+}
