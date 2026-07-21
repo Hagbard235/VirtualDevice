@@ -636,6 +636,7 @@ class ToDoZentrale extends IPSModule {
             case "GELB":  return 0xFFFF00;
             case "ROT":   return 0xFF0000;
             case "BLAU":  return 0x0000FF;
+            case "LILA":  case "VIOLETT": return 0xBF00FF;
             case "ORANGE": return 0xFF8800;
             case "GRAU":  return 0x888888;
             case "WEISS": return 0xFFFFFF;

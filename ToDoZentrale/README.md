@@ -51,8 +51,10 @@ TODO_Set(InstanceID, "MUELL", "Gelbe Tonne rausstellen", json_encode([
 ]));
 ```
 
-Alle Optionen sind freiwillig; beim Aktualisieren einer bestehenden Aufgabe
-bleiben nicht angegebene Felder erhalten.
+Alle Optionen sind freiwillig. Existiert der Ident bereits, wird die Aufgabe
+aktualisiert statt verdoppelt, und nicht angegebene Felder bleiben erhalten —
+`TODO_Set` dient also zugleich zum Ändern von Text, Farbe, Icon oder Priorität
+einer laufenden Aufgabe. Eine eigene „Ändern"-Funktion braucht es nicht.
 
 | Option | Bedeutung |
 |---|---|
@@ -60,7 +62,7 @@ bleiben nicht angegebene Felder erhalten.
 | `prio` | 0 Niedrig, 1 Normal, 2 Wichtig, 3 Kritisch |
 | `quittierung` | siehe Tabelle oben |
 | `sprache` | abweichender Text für die Ansage |
-| `farbe` | `ROT`, `GELB`, `GRUEN`, `BLAU`, `ORANGE`, `GRAU` oder `#FF8800` |
+| `farbe` | `ROT`, `GELB`, `GRUEN`, `BLAU`, `LILA`, `ORANGE`, `GRAU`, `WEISS`, `SCHWARZ` oder ein Hexwert wie `#FF8800` |
 | `icon` | IP-Symcon-Iconname |
 | `schalter` | Beschriftung der Kachel |
 | `faellig` | Unix-Zeitstempel |
