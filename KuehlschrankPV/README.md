@@ -85,9 +85,16 @@ verworfen.
 - **Verdichterschutz**: Mindestpause vor dem Wiedereinschalten (Standard 10 min) und
   Mindestlaufzeit vor dem Abschalten (Standard 5 min). Die Mindestpause gilt immer,
   auch im Not- und Handbetrieb — sie schützt die Hardware.
-- **Sensorüberwachung**: Meldet ein Fühler länger als eingestellt nichts mehr oder
-  liefert er unplausible Werte, geht das Modul in den Notbetrieb und lässt den
-  Kühlschrank dauerhaft am Netz.
+- **Sensorüberwachung**: Liefert ein Fühler unplausible Werte (außerhalb −45 bis
+  +30 °C), geht das Modul in den Notbetrieb und lässt den Kühlschrank dauerhaft am
+  Netz. Auf Schweigen wird nur während der Aus-Phasen geprüft, und zwar ab deren
+  Beginn: die meisten Fühler senden nur bei relevanter Änderung, und solange der
+  Kühlschrank Strom hat, hält der Thermostat die Temperatur — stundenlanges
+  Schweigen ist dann normal, ein ausgefallener Fühler zudem ungefährlich, weil das
+  Gerät selbst regelt. Ohne Strom steigt die Temperatur dagegen zwangsläufig, ein
+  funktionierender Sensor muss sich also melden. Bei grob auflösenden Fühlern und
+  langsamer Erwärmung den Wert großzügig wählen (Standard 180 min) oder mit 0
+  abschalten — die maximale Aus-Zeit schützt dann weiterhin.
 - **Maximale Aus-Zeit** (Standard 12 h): Sicherheitsnetz gegen einen Fühler, der
   plausible, aber eingefrorene Werte liefert. 0 schaltet das Limit ab.
 - **Schaltkontrolle**: Übernimmt die Steckdose einen Befehl dreimal nicht, geht die

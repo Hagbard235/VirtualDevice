@@ -97,7 +97,7 @@ class KuehlschrankPV extends IPSModule {
         $this->RegisterPropertyInteger("MinOffMinutes", 10);
         $this->RegisterPropertyInteger("MinOnMinutes", 5);
         $this->RegisterPropertyInteger("MaxOffMinutes", 720);
-        $this->RegisterPropertyInteger("SensorTimeoutMinutes", 30);
+        $this->RegisterPropertyInteger("SensorTimeoutMinutes", 180);
         $this->RegisterPropertyInteger("CheckInterval", 60);
         $this->RegisterPropertyFloat("DefaultDriftFreezer", 1.0);
         $this->RegisterPropertyFloat("DefaultDriftFridge", 1.5);
@@ -305,6 +305,13 @@ class KuehlschrankPV extends IPSModule {
         $this->SetValue("NextPVStart", $this->PredictPVStart());
 
         $mode = $this->GetValue("Mode");
+
+        // Eine Sensorstoerung aus der Automatik darf nicht stehen bleiben, wenn
+        // danach von Hand umgeschaltet wird - in den Handmodi wird sie unten
+        // gar nicht mehr geprueft.
+        if ($mode != self::MODE_AUTO && $this->GetStatus() == 202) {
+            $this->SetStatus(102);
+        }
 
         if ($mode == self::MODE_NORMAL) {
             if ($this->ApplyPower(true, true)) {
@@ -524,12 +531,27 @@ class KuehlschrankPV extends IPSModule {
             return;
         }
 
-        $variable = IPS_GetVariable($id);
-        $ageMinutes = (time() - $variable['VariableUpdated']) / 60.0;
+        // Ausfallerkennung nur waehrend der Aus-Phasen. Fuehler melden meist nur
+        // bei relevanter Aenderung, und solange der Kuehlschrank Strom hat,
+        // haelt der Thermostat die Temperatur - stundenlanges Schweigen ist dann
+        // normal und ein ausgefallener Fuehler ohnehin ungefaehrlich, weil das
+        // Geraet selbst regelt. Erst ohne Strom steigt die Temperatur zwangs-
+        // laeufig, und dann muss sich ein funktionierender Sensor melden.
         $timeout = $this->ReadPropertyInteger("SensorTimeoutMinutes");
-        if ($timeout > 0 && $ageMinutes > $timeout) {
-            $errors[] = sprintf("Sensor %s meldet seit %d min nichts mehr.", $label, round($ageMinutes));
-            return;
+        if ($timeout > 0 && !$meas['powerOn']) {
+            $variable = IPS_GetVariable($id);
+            $lastUpdate = $variable['VariableUpdated'];
+
+            // Gemessen wird ab Beginn der Aus-Phase: vorher darf der Fuehler
+            // beliebig lange geschwiegen haben.
+            $coastStart = $this->ReadAttributeFloat("CoastStart");
+            $reference = ($coastStart > $lastUpdate) ? $coastStart : $lastUpdate;
+
+            $silentMinutes = (time() - $reference) / 60.0;
+            if ($silentMinutes > $timeout) {
+                $errors[] = sprintf("Sensor %s meldet seit %d min nichts mehr, obwohl der Kuehlschrank stromlos ist.", $label, round($silentMinutes));
+                return;
+            }
         }
 
         $value = (float)GetValue($id);

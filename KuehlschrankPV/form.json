@@ -250,7 +250,7 @@
         {
           "type": "NumberSpinner",
           "name": "SensorTimeoutMinutes",
-          "caption": "Sensor gilt als ausgefallen nach (0 = keine Pruefung)",
+          "caption": "Schweigt der Fuehler waehrend einer Aus-Phase so lange, gilt er als ausgefallen (0 = keine Pruefung)",
           "suffix": "Minuten",
           "minimum": 0
         },
