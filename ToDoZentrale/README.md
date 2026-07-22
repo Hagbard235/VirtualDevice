@@ -36,6 +36,12 @@ danebengehen kann.
 eigenem Ort im Objektbaum, eigener Farbe und eigenem Icon. Aufgaben ohne
 Kategorie landen am eingestellten Standardort.
 
+Als Ort ist neben einer Kategorie auch eine **Instanz** zulässig, typischerweise
+ein Dummy-Modul. Das ist meist die bessere Wahl: Kategorien erzeugen in der
+Visualisierung eigene Navigationsknoten, ein Dummy-Modul dagegen bündelt die
+Kacheln als ein Gerät. Andere Objekttypen werden abgelehnt und fallen auf den
+Standardort zurück.
+
 Diese Trennung ist Absicht: Wie etwas quittiert wird und wozu es gehört, sind
 zwei unabhängige Fragen.
 

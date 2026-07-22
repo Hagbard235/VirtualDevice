@@ -36,11 +36,11 @@
               "edit": { "type": "ValidationTextBox" }
             },
             {
-              "caption": "Ort der Kacheln",
+              "caption": "Ort der Kacheln (Kategorie oder Instanz)",
               "name": "ParentID",
               "width": "300px",
               "add": 0,
-              "edit": { "type": "SelectCategory" }
+              "edit": { "type": "SelectObject" }
             },
             {
               "caption": "Farbe",
@@ -59,14 +59,18 @@
           ]
         },
         {
-          "type": "SelectCategory",
+          "type": "SelectObject",
           "name": "DefaultParentID",
-          "caption": "Ort fuer Aufgaben ohne Kategorie",
+          "caption": "Ort fuer Aufgaben ohne Kategorie (Kategorie oder Instanz)",
           "width": "600px"
         },
         {
           "type": "Label",
-          "caption": "Farbe entweder als Klartext (ROT, GELB, GRUEN, BLAU, ORANGE, GRAU) oder als Hexwert (#FF8800). Bleibt sie leer, faerbt die Prioritaet der Aufgabe."
+          "caption": "Als Ort ist neben einer Kategorie auch eine Instanz zulaessig - etwa ein Dummy-Modul. Das vermeidet zusaetzliche Navigationsknoten in der Visualisierung."
+        },
+        {
+          "type": "Label",
+          "caption": "Farbe entweder als Klartext (ROT, GELB, GRUEN, BLAU, LILA, ORANGE, GRAU) oder als Hexwert (#FF8800). Bleibt sie leer, faerbt die Prioritaet der Aufgabe."
         }
       ]
     },
@@ -195,9 +199,9 @@
       "type": "RowLayout",
       "items": [
         {
-          "type": "SelectCategory",
+          "type": "SelectObject",
           "name": "AdoptCategory",
-          "caption": "Bestehende ToDo-Kategorie",
+          "caption": "Bestehender Ort der ToDo-Kacheln",
           "width": "400px"
         },
         {

@@ -309,9 +309,9 @@ class ToDoZentrale extends IPSModule {
      * Uebernimmt vorhandene ToDo-Kacheln einer Kategorie in die Verwaltung
      * des Moduls. Gedacht fuer die Migration vom bisherigen Skript-System.
      */
-    public function AdoptLegacy(int $CategoryID) {
-        if (!IPS_ObjectExists($CategoryID)) {
-            echo "Kategorie $CategoryID existiert nicht.\n";
+    public function AdoptLegacy(int $ParentID) {
+        if (!$this->CanHoldChildren($ParentID)) {
+            echo "Objekt $ParentID existiert nicht oder kann keine Kacheln enthalten.\n";
             return;
         }
 
@@ -319,7 +319,7 @@ class ToDoZentrale extends IPSModule {
         $rendered = $this->GetRendered();
         $count = 0;
 
-        foreach (IPS_GetChildrenIDs($CategoryID) as $childID) {
+        foreach (IPS_GetChildrenIDs($ParentID) as $childID) {
             if (!IPS_VariableExists($childID)) continue;
             $object = IPS_GetObject($childID);
             $ident = $object['ObjectIdent'];
@@ -600,11 +600,22 @@ class ToDoZentrale extends IPSModule {
     private function ResolveParent(array $item, array $categories): int {
         if (isset($categories[$item['category']])) {
             $parentID = (int)$categories[$item['category']]['ParentID'];
-            if ($parentID > 0 && IPS_ObjectExists($parentID)) return $parentID;
+            if ($this->CanHoldChildren($parentID)) return $parentID;
         }
         $fallback = $this->ReadPropertyInteger("DefaultParentID");
-        if ($fallback > 0 && IPS_ObjectExists($fallback)) return $fallback;
+        if ($this->CanHoldChildren($fallback)) return $fallback;
         return $this->InstanceID;
+    }
+
+    /**
+     * Kacheln koennen unter einer Kategorie oder unter einer Instanz haengen -
+     * etwa einem Dummy-Modul, was in der Visualisierung einen zusaetzlichen
+     * Navigationsknoten spart. Alles andere kann keine Kinder aufnehmen.
+     */
+    private function CanHoldChildren(int $objectID): bool {
+        if ($objectID <= 0 || !IPS_ObjectExists($objectID)) return false;
+        $type = IPS_GetObject($objectID)['ObjectType'];
+        return ($type == 0 || $type == 1);
     }
 
     private function ResolveColor(array $item, $category): int {
