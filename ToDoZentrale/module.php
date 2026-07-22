@@ -682,21 +682,22 @@ class ToDoZentrale extends IPSModule {
             return;
         }
         $targets = is_array($item['voiceTargets']) ? $item['voiceTargets'] : [];
-        $this->SpeakRaw($text, $targets, true);
+        // Der Aufgabentext dient als Titel - er ist kurz und benennt die Sache,
+        // waehrend der gesprochene Text ein ganzer Satz sein darf.
+        $this->SpeakRaw($text, $targets, true, $item['text']);
     }
 
     /**
-     * @param bool $respectQuiet Ruhezeit beachten. Direkte Aufrufe ueber
-     *                           TODO_Speak sprechen bewusst auch nachts.
+     * @param bool   $respectQuiet Ruhezeit beachten. Direkte Aufrufe ueber
+     *                             TODO_Speak melden bewusst auch nachts.
+     * @param string $title        Ueberschrift; leer bedeutet, dass der je Ziel
+     *                             hinterlegte Titel verwendet wird.
      */
-    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet) {
+    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "") {
         $text = trim($text);
         if ($text === "") return;
 
-        if ($respectQuiet && $this->IsQuietTime()) {
-            $this->SendDebug("Sprache", "Ruhezeit - nicht gesprochen: $text", 0);
-            return;
-        }
+        $quiet = $respectQuiet && $this->IsQuietTime();
 
         // Wiederholungsdaempfung: derselbe Satz nicht mehrfach kurz nacheinander.
         $suppress = $this->ReadPropertyInteger("RepeatSuppressSeconds");
@@ -706,28 +707,46 @@ class ToDoZentrale extends IPSModule {
                 $this->SendDebug("Sprache", "Wiederholung unterdrueckt: $text", 0);
                 return;
             }
-            $this->SetBuffer("LastSpeech", json_encode(['text' => $text, 'ts' => time()]));
         }
 
-        $spoken = 0;
+        $delivered = 0;
+        $skipped = 0;
         foreach ($this->GetVoiceTargets() as $target) {
             if (!$target['Enabled']) continue;
             if (count($targetKeys) > 0 && !in_array($target['Key'], $targetKeys)) continue;
 
+            // Die Ruhezeit gilt je Ziel: eine stille Push-Nachricht darf nachts
+            // durchaus raus, eine gesprochene Ansage nicht.
+            if ($quiet && $target['RespectQuiet']) {
+                $skipped++;
+                continue;
+            }
+
+            $useTitle = $title !== "" ? $title : $target['Title'];
             $scriptID = (int)$target['ScriptID'];
             $variableID = (int)$target['VariableID'];
 
             if ($scriptID > 0 && IPS_ScriptExists($scriptID)) {
                 // Parameternamen bewusst wie im bisherigen Ansageskript.
-                @IPS_RunScriptEx($scriptID, ['Titel' => $target['Title'], 'Text' => $text]);
-                $spoken++;
+                @IPS_RunScriptEx($scriptID, ['Titel' => $useTitle, 'Text' => $text]);
+                $delivered++;
             } elseif ($variableID > 0 && IPS_VariableExists($variableID)) {
                 @RequestAction($variableID, $text);
-                $spoken++;
+                $delivered++;
             }
         }
 
-        $this->SendDebug("Sprache", "Gesprochen ueber $spoken Ziel(e): $text", 0);
+        // Nur was tatsaechlich rausging, zaehlt fuer die Wiederholungssperre -
+        // sonst bliebe eine in der Ruhezeit verschluckte Meldung anschliessend
+        // gesperrt.
+        if ($delivered > 0 && $suppress > 0) {
+            $this->SetBuffer("LastSpeech", json_encode(['text' => $text, 'ts' => time()]));
+        }
+
+        $this->SendDebug("Sprache", sprintf(
+            "An %d Ziel(e) ausgeliefert%s: %s",
+            $delivered, $skipped > 0 ? ", $skipped wegen Ruhezeit uebersprungen" : "", $text
+        ), 0);
     }
 
     private function IsQuietTime(): bool {
@@ -823,6 +842,7 @@ class ToDoZentrale extends IPSModule {
                     'Title'      => isset($entry['Title']) && $entry['Title'] !== "" ? $entry['Title'] : "Hinweis",
                     'ScriptID'   => isset($entry['ScriptID']) ? (int)$entry['ScriptID'] : 0,
                     'VariableID' => isset($entry['VariableID']) ? (int)$entry['VariableID'] : 0,
+                    'RespectQuiet' => isset($entry['RespectQuiet']) ? (bool)$entry['RespectQuiet'] : true,
                     'Enabled'    => isset($entry['Enabled']) ? (bool)$entry['Enabled'] : true
                 ];
             }

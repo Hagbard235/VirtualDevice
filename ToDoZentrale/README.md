@@ -106,12 +106,22 @@ Parameter ist eine kommaseparierte Liste von Ziel-Schlüsseln, leer bedeutet all
 Sprachziele werden als Liste konfiguriert. Ein Ziel ist entweder ein **Skript**,
 das mit den Parametern `Titel` und `Text` aufgerufen wird, oder eine **Variable**,
 in die der Text per `RequestAction` geschrieben wird. Damit lässt sich jede
-Ansagetechnik anbinden, ohne das Modul zu ändern.
+Ansagetechnik anbinden, ohne das Modul zu ändern — für Instanzfunktionen wie
+`ECHOREMOTE_TextToSpeech` genügt ein einzeiliges Adapterskript.
 
-Vier Mechanismen halten die Ansagen erträglich, wenn Sprache im Haus häufiger
+Als `Titel` übergibt das Modul den **Aufgabentext** — kurz und benennend —,
+während `Text` der ausformulierte Satz ist. Nur bei freien Ansagen über
+`TODO_Speak` wird der je Ziel hinterlegte Titel verwendet.
+
+Weil nicht jedes Ziel gleich laut ist, gilt die **Ruhezeit je Ziel**: Eine
+gesprochene Ansage soll nachts schweigen, eine stille Push-Nachricht darf
+durchaus zugestellt werden. Dafür das Häkchen „Ruhezeit beachten" abwählen.
+
+Vier Mechanismen halten die Meldungen erträglich, wenn Sprache im Haus häufiger
 wird:
 
-- **Ruhezeit** — in ihr wird nichts gesprochen, die Kacheln bleiben sichtbar.
+- **Ruhezeit** — in ihr schweigen die Ziele, die sie beachten; die Kacheln
+  bleiben sichtbar.
 - **Zusammenfassung** — werden mehrere Erinnerungen gleichzeitig fällig, gibt es
   ab der eingestellten Anzahl eine Sammelansage statt mehrerer Einzelmeldungen.
 - **Wiederholungsdämpfung** — derselbe Satz wird innerhalb der eingestellten
