@@ -229,7 +229,7 @@
         {
           "type": "NumberSpinner",
           "name": "MinOffMinutes",
-          "caption": "Mindestpause vor dem Wiedereinschalten (Verdichterschutz)",
+          "caption": "Mindestpause vor dem Einschalten",
           "suffix": "Minuten",
           "minimum": 0
         },
@@ -243,16 +243,20 @@
         {
           "type": "NumberSpinner",
           "name": "MaxOffMinutes",
-          "caption": "Maximale Aus-Zeit, danach Zwangskuehlung (0 = kein Limit)",
+          "caption": "Maximale Aus-Zeit (0 = kein Limit)",
           "suffix": "Minuten",
           "minimum": 0
         },
         {
           "type": "NumberSpinner",
           "name": "SensorTimeoutMinutes",
-          "caption": "Schweigt der Fuehler waehrend einer Aus-Phase so lange, gilt er als ausgefallen (0 = keine Pruefung)",
+          "caption": "Sensor gilt als ausgefallen nach (0 = keine Pruefung)",
           "suffix": "Minuten",
           "minimum": 0
+        },
+        {
+          "type": "Label",
+          "caption": "Auf Schweigen wird nur waehrend der Aus-Phasen geprueft, gerechnet ab deren Beginn: die meisten Fuehler senden nur bei Aenderung, und mit Strom haelt der Thermostat die Temperatur. Bei grob aufloesenden Fuehlern grosszuegig waehlen."
         },
         {
           "type": "NumberSpinner",

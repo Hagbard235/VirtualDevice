@@ -80,7 +80,8 @@ class GeraetLauf extends IPSModule {
         $this->RegisterAttributeFloat("PeakWatt", 0.0);
         $this->RegisterAttributeFloat("EnergyWs", 0.0);
         $this->RegisterAttributeFloat("LastSample", 0.0);
-        $this->RegisterAttributeBoolean("SpinSeen", false);
+        // Zeitpunkt des erkannten Schleuderns. 0 = nicht erkannt oder verworfen.
+        $this->RegisterAttributeFloat("SpinAt", 0.0);
         $this->RegisterAttributeString("History", "[]");
 
         $this->CreateProfiles();
@@ -228,7 +229,7 @@ class GeraetLauf extends IPSModule {
         $this->WriteAttributeFloat("RunStart", $now);
         $this->WriteAttributeFloat("PeakWatt", 0.0);
         $this->WriteAttributeFloat("EnergyWs", 0.0);
-        $this->WriteAttributeBoolean("SpinSeen", false);
+        $this->WriteAttributeFloat("SpinAt", 0.0);
 
         $this->SetValue("RunStartVar", (int)$now);
         $this->SetValue("RunMinutes", 0);
@@ -414,14 +415,32 @@ class GeraetLauf extends IPSModule {
             }
         }
 
-        // Schleudern: kurze, hohe Last in der zweiten Programmhaelfte. Danach
-        // ist es nur noch eine Frage weniger Minuten.
-        if ($power >= $this->ReadPropertyFloat("SpinWatt") && $elapsed > ($typical * 0.5)) {
-            $this->WriteAttributeBoolean("SpinSeen", true);
-        }
-        if ($this->ReadAttributeBoolean("SpinSeen")) {
-            $spin = (float)$this->ReadPropertyInteger("SpinRemainingMinutes");
-            if ($remaining > $spin) $remaining = $spin;
+        // Schleudern: kurze, hohe Last in der zweiten Programmhaelfte. Die
+        // Zeitbedingung trennt es von der Heizphase am Anfang, die noch mehr
+        // zieht.
+        $spinWatt = $this->ReadPropertyFloat("SpinWatt");
+        if ($spinWatt > 0) {
+            if ($power >= $spinWatt && $elapsed > ($typical * 0.5) && $this->ReadAttributeFloat("SpinAt") <= 0) {
+                $this->WriteAttributeFloat("SpinAt", microtime(true));
+                $this->SendDebug("Prognose", sprintf("Schleudern erkannt bei %.0f W nach %.0f min", $power, $elapsed), 0);
+            }
+
+            $spinAt = $this->ReadAttributeFloat("SpinAt");
+            if ($spinAt > 0) {
+                $spinTotal = (float)$this->ReadPropertyInteger("SpinRemainingMinutes");
+                $sinceSpin = (microtime(true) - $spinAt) / 60.0;
+
+                if ($sinceSpin > $spinTotal) {
+                    // Laeuft laenger als nach dem Schleudern zu erwarten - es war
+                    // ein Zwischenschleudern. Annahme verwerfen, statt bis zum
+                    // Programmende eine falsche Restzeit anzuzeigen.
+                    $this->WriteAttributeFloat("SpinAt", 0.0);
+                    $this->SendDebug("Prognose", "Geraet laeuft weiter - war Zwischenschleudern, Restzeitannahme verworfen", 0);
+                } else {
+                    $rest = $spinTotal - $sinceSpin;
+                    if ($remaining > $rest) $remaining = $rest;
+                }
+            }
         }
 
         if ($remaining < 0) $remaining = 0;

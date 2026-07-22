@@ -61,7 +61,7 @@
         {
           "type": "SelectObject",
           "name": "DefaultParentID",
-          "caption": "Ort fuer Aufgaben ohne Kategorie (Kategorie oder Instanz)",
+          "caption": "Standardort fuer Aufgaben ohne Kategorie",
           "width": "600px"
         },
         {
@@ -166,15 +166,20 @@
         {
           "type": "NumberSpinner",
           "name": "SummaryThreshold",
-          "caption": "Ab so vielen gleichzeitigen Erinnerungen zusammenfassen (0 = nie)",
+          "caption": "Zusammenfassen ab (0 = nie)",
+          "suffix": "Erinnerungen",
           "minimum": 0
         },
         {
           "type": "NumberSpinner",
           "name": "RepeatSuppressSeconds",
-          "caption": "Gleichen Satz nicht erneut sprechen innerhalb von",
+          "caption": "Wiederholungssperre",
           "suffix": "Sekunden",
           "minimum": 0
+        },
+        {
+          "type": "Label",
+          "caption": "Werden mehrere Erinnerungen gleichzeitig faellig, gibt es ab der genannten Anzahl eine Sammelansage statt mehrerer Einzelmeldungen. Die Wiederholungssperre verhindert, dass derselbe Satz kurz hintereinander erneut kommt."
         }
       ]
     },

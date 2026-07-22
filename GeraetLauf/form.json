@@ -76,17 +76,21 @@
         {
           "type": "NumberSpinner",
           "name": "MinRunMinutes",
-          "caption": "Mindestdauer, damit es als Programmlauf zaehlt",
+          "caption": "Mindestdauer eines Programmlaufs",
           "suffix": "Minuten",
           "minimum": 0
         },
         {
           "type": "NumberSpinner",
           "name": "MinPeakWatt",
-          "caption": "Mindest-Spitzenleistung, damit es als Programmlauf zaehlt",
+          "caption": "Mindest-Spitzenleistung",
           "suffix": "W",
           "digits": 0,
           "minimum": 0
+        },
+        {
+          "type": "Label",
+          "caption": "Beide Werte muessen erreicht sein, damit das Ende als Programmende zaehlt. Ein kurzes Aufblinken des Displays oder ein reiner Abpumpvorgang loest damit keine Fertig-Meldung aus."
         }
       ]
     },
@@ -96,12 +100,12 @@
       "items": [
         {
           "type": "Label",
-          "caption": "Grundlage ist die typische Dauer vergangener Laeufe (Median). Sobald genug Energie verbraucht wurde, fliesst der Energiefortschritt mit ein. Wird die Schleuderphase erkannt, gilt die kurze Restzeit."
+          "caption": "Grundlage ist die typische Dauer vergangener Laeufe (Median). Sobald genug Energie verbraucht wurde, fliesst der Energiefortschritt mit ein."
         },
         {
           "type": "NumberSpinner",
           "name": "DefaultRunMinutes",
-          "caption": "Angenommene Dauer, bis Laeufe gelernt sind",
+          "caption": "Angenommene Dauer (bis gelernt)",
           "suffix": "Minuten",
           "minimum": 1
         },
@@ -113,9 +117,13 @@
           "maximum": 100
         },
         {
+          "type": "Label",
+          "caption": "Schleudern zieht kurzzeitig viel Leistung und liegt am Programmende. Wird es in der zweiten Programmhaelfte erkannt, gilt ab da die kurze Restzeit. Die Zeitbedingung trennt es von der Heizphase am Anfang, die noch mehr zieht. Laeuft das Geraet danach weiter, war es ein Zwischenschleudern und die Schaetzung faellt automatisch zurueck. Bei haeufigen Fehltreffern den Wert anheben."
+        },
+        {
           "type": "NumberSpinner",
           "name": "SpinWatt",
-          "caption": "Ab dieser Leistung in der zweiten Programmhaelfte gilt es als Schleudern (0 = aus)",
+          "caption": "Schleudern erkannt ab (0 = aus)",
           "suffix": "W",
           "digits": 0,
           "minimum": 0
@@ -208,13 +216,17 @@
         {
           "type": "SelectVariable",
           "name": "SuppressVarID",
-          "caption": "Erinnerung unterdruecken, solange diese Variable gilt (z.B. Trockner laeuft)",
+          "caption": "Erinnerung unterdruecken, solange diese Variable gilt",
           "width": "600px"
         },
         {
           "type": "CheckBox",
           "name": "SuppressWhenTrue",
           "caption": "Unterdruecken, wenn die Variable True ist"
+        },
+        {
+          "type": "Label",
+          "caption": "Damit laesst sich ein zweites Geraet beruecksichtigen - etwa keine Erinnerung an die Waschmaschine, solange der Trockner laeuft. Die Aufgabe bleibt sichtbar, nur die Erinnerung schweigt."
         }
       ]
     },
