@@ -53,15 +53,20 @@ class GeraetLauf extends IPSModule {
         $this->RegisterPropertyFloat("SpinWatt", 300.0);
         $this->RegisterPropertyInteger("SpinRemainingMinutes", 8);
 
-        // Anbindung an die ToDo-Zentrale
+        // Anbindung an die ToDo-Zentrale.
+        // Idents und Texte bleiben leer und werden dann aus dem Geraetenamen
+        // abgeleitet - so bekommt jede Instanz von sich aus eigene Werte und
+        // zwei Geraete kollidieren nicht auf derselben Aufgabe. Ein bestehender
+        // Ident wie "WMFERTIG" laesst sich hier eintragen, um eine vorhandene
+        // Visualisierung unveraendert weiterzunutzen.
         $this->RegisterPropertyInteger("ToDoInstanceID", 0);
-        $this->RegisterPropertyString("IdentRunning", "WMLAEUFT");
-        $this->RegisterPropertyString("IdentDone", "WMFERTIG");
+        $this->RegisterPropertyString("IdentRunning", "");
+        $this->RegisterPropertyString("IdentDone", "");
         $this->RegisterPropertyString("Category", "");
         $this->RegisterPropertyBoolean("ShowRunningTile", true);
-        $this->RegisterPropertyString("TextRunning", "Waschmaschine laeuft");
-        $this->RegisterPropertyString("TextDone", "Waschmaschine ausraeumen");
-        $this->RegisterPropertyString("SpeechDone", "Die Waschmaschine ist fertig");
+        $this->RegisterPropertyString("TextRunning", "");
+        $this->RegisterPropertyString("TextDone", "");
+        $this->RegisterPropertyString("SpeechDone", "");
         $this->RegisterPropertyInteger("DonePriority", 2);
         $this->RegisterPropertyInteger("RemindMinutes", 30);
         $this->RegisterPropertyInteger("RemindMax", 0);
@@ -171,7 +176,7 @@ class GeraetLauf extends IPSModule {
 
         $this->SetValue("Info", sprintf(
             "Bereit. %s zieht %.0f W, Startschwelle sind %.0f W.",
-            $this->ReadPropertyString("DeviceName"), $power, $this->ReadPropertyFloat("StartWatt")
+            $this->DeviceName(), $power, $this->ReadPropertyFloat("StartWatt")
         ));
     }
 
@@ -195,7 +200,7 @@ class GeraetLauf extends IPSModule {
         $remaining = $this->GetValue("RemainingMinutes");
         $this->SetValue("Info", sprintf(
             "%s laeuft seit %s, aktuell %.0f W.%s",
-            $this->ReadPropertyString("DeviceName"),
+            $this->DeviceName(),
             $this->FormatMinutes($elapsed),
             $power,
             $remaining > 0 ? " Voraussichtlich noch " . $this->FormatMinutes($remaining) . "." : ""
@@ -206,21 +211,21 @@ class GeraetLauf extends IPSModule {
         // Tuer auf heisst: jemand war da. Damit ist nichts mehr auszuraeumen.
         if ($doorOpen) {
             $this->SendDebug("Zustand", "Tuer geoeffnet - Waesche gilt als entnommen", 0);
-            $this->ClearToDo($this->ReadPropertyString("IdentDone"));
-            $this->SetState(self::STATE_BEREIT, $this->ReadPropertyString("DeviceName") . " ist leergeraeumt.");
+            $this->ClearToDo($this->IdentDone());
+            $this->SetState(self::STATE_BEREIT, $this->DeviceName() . " ist leergeraeumt.");
             return;
         }
 
         // Ein neuer Programmstart beendet den Fertig-Zustand ebenfalls.
         if ($this->HeldFor("AboveSince", $this->ReadPropertyInteger("StartHoldSeconds"))) {
-            $this->ClearToDo($this->ReadPropertyString("IdentDone"));
+            $this->ClearToDo($this->IdentDone());
             $this->StartRun();
             return;
         }
 
         $this->SetValue("Info", sprintf(
             "%s ist fertig, Tuer noch geschlossen - Waesche wartet.",
-            $this->ReadPropertyString("DeviceName")
+            $this->DeviceName()
         ));
     }
 
@@ -233,12 +238,12 @@ class GeraetLauf extends IPSModule {
 
         $this->SetValue("RunStartVar", (int)$now);
         $this->SetValue("RunMinutes", 0);
-        $this->SetState(self::STATE_LAEUFT, $this->ReadPropertyString("DeviceName") . " hat gestartet.");
+        $this->SetState(self::STATE_LAEUFT, $this->DeviceName() . " hat gestartet.");
 
-        $this->ClearToDo($this->ReadPropertyString("IdentDone"));
+        $this->ClearToDo($this->IdentDone());
 
         if ($this->ReadPropertyBoolean("ShowRunningTile")) {
-            $this->SetToDo($this->ReadPropertyString("IdentRunning"), $this->ReadPropertyString("TextRunning"), [
+            $this->SetToDo($this->IdentRunning(), $this->TextRunning(), [
                 'kategorie'   => $this->ReadPropertyString("Category"),
                 'quittierung' => self::ACK_INFO,
                 'prio'        => 0,
@@ -255,7 +260,7 @@ class GeraetLauf extends IPSModule {
         $minMinutes = $this->ReadPropertyInteger("MinRunMinutes");
         $minPeak = $this->ReadPropertyFloat("MinPeakWatt");
 
-        $this->ClearToDo($this->ReadPropertyString("IdentRunning"));
+        $this->ClearToDo($this->IdentRunning());
 
         // Plausibilitaet: zu kurz oder ohne echte Last war kein Programmlauf,
         // sondern zum Beispiel nur das Display oder ein Abpumpvorgang.
@@ -266,7 +271,7 @@ class GeraetLauf extends IPSModule {
             ), 0);
             $this->SetState(self::STATE_BEREIT, sprintf(
                 "Kurzer Verbrauch von %s ignoriert (%s, Spitze %.0f W).",
-                $this->ReadPropertyString("DeviceName"), $this->FormatMinutes($elapsed), $peak
+                $this->DeviceName(), $this->FormatMinutes($elapsed), $peak
             ));
             return;
         }
@@ -278,7 +283,7 @@ class GeraetLauf extends IPSModule {
         $this->SetValue("RemainingMinutes", 0);
         $this->SetState(self::STATE_FERTIG, sprintf(
             "%s ist fertig (%s, %.2f kWh).",
-            $this->ReadPropertyString("DeviceName"), $this->FormatMinutes($elapsed), $kwh
+            $this->DeviceName(), $this->FormatMinutes($elapsed), $kwh
         ));
 
         // Die Aufgabe erledigt sich selbst, sobald die Tuer aufgeht. Das ist
@@ -292,7 +297,7 @@ class GeraetLauf extends IPSModule {
             'prio'        => $this->ReadPropertyInteger("DonePriority"),
             'farbe'       => "ROT",
             'schalter'    => "...Fertig!...",
-            'sprache'     => $this->ReadPropertyString("SpeechDone"),
+            'sprache'     => $this->SpeechDone(),
             'erinnerung'  => $this->ReadPropertyInteger("RemindMinutes") * 60,
             'erinnerungMax' => $this->ReadPropertyInteger("RemindMax"),
             'sprechen'    => self::SPEAK_NEU | self::SPEAK_ERINNERUNG
@@ -309,7 +314,7 @@ class GeraetLauf extends IPSModule {
             $options['stummMode'] = $this->ReadPropertyBoolean("SuppressWhenTrue") ? self::CMP_WAHR : self::CMP_FALSCH;
         }
 
-        $this->SetToDo($this->ReadPropertyString("IdentDone"), $this->ReadPropertyString("TextDone"), $options);
+        $this->SetToDo($this->IdentDone(), $this->TextDone(), $options);
     }
 
     private function SetState(int $state, string $info) {
@@ -490,6 +495,58 @@ class GeraetLauf extends IPSModule {
     // ------------------------------------------------------------------
     // Anbindung an die ToDo-Zentrale
     // ------------------------------------------------------------------
+
+    // Idents und Texte werden aus dem Geraetenamen abgeleitet, solange die
+    // jeweilige Property leer ist. So bekommt jede Instanz eigene Werte, ohne
+    // dass zwei Geraete auf derselben Aufgabe kollidieren koennen.
+
+    private function IdentRunning(): string {
+        $ident = trim($this->ReadPropertyString("IdentRunning"));
+        return $ident !== "" ? $ident : $this->DeviceIdent() . "_LAEUFT";
+    }
+
+    private function IdentDone(): string {
+        $ident = trim($this->ReadPropertyString("IdentDone"));
+        return $ident !== "" ? $ident : $this->DeviceIdent() . "_FERTIG";
+    }
+
+    private function TextRunning(): string {
+        $text = trim($this->ReadPropertyString("TextRunning"));
+        return $text !== "" ? $text : $this->DeviceName() . " laeuft";
+    }
+
+    private function TextDone(): string {
+        $text = trim($this->ReadPropertyString("TextDone"));
+        return $text !== "" ? $text : $this->DeviceName() . " ausraeumen";
+    }
+
+    private function SpeechDone(): string {
+        $text = trim($this->ReadPropertyString("SpeechDone"));
+        return $text !== "" ? $text : $this->DeviceName() . " ist fertig";
+    }
+
+    private function DeviceName(): string {
+        $name = trim($this->ReadPropertyString("DeviceName"));
+        return $name !== "" ? $name : "Geraet";
+    }
+
+    /**
+     * Geraetenamen in einen gueltigen Ident-Baustein wandeln: nur Buchstaben
+     * und Ziffern, Grossschrift, ohne fuehrende Ziffer.
+     */
+    private function DeviceIdent(): string {
+        // Umlaute vor strtoupper ersetzen: PHP-strtoupper laesst Umlaute liegen,
+        // deshalb beide Schreibweisen abdecken.
+        $ident = strtr($this->DeviceName(), [
+            'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'ß' => 'ss',
+            'Ä' => 'Ae', 'Ö' => 'Oe', 'Ü' => 'Ue'
+        ]);
+        $ident = strtoupper($ident);
+        $ident = preg_replace('/[^A-Z0-9]/', '', $ident);
+        if ($ident === "") $ident = "GERAET";
+        if (preg_match('/^[0-9]/', $ident)) $ident = "G" . $ident;
+        return $ident;
+    }
 
     private function SetToDo(string $ident, string $text, array $options) {
         $instanceID = $this->ReadPropertyInteger("ToDoInstanceID");

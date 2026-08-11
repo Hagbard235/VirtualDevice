@@ -62,10 +62,20 @@ Programmen streut sie. Erst nach einigen Läufen wird sie brauchbar.
 ## Aufgaben
 
 Beim Start entsteht optional eine Info-Kachel („läuft"), beim Programmende die
-eigentliche Aufgabe („ausräumen"). Deren Ident, Text, Farbe, Priorität und
-Erinnerungsintervall sind konfigurierbar; die Idents lassen sich auf bestehende
-Werte wie `WMLAEUFT` und `WMFERTIG` setzen, damit eine vorhandene Visualisierung
-unverändert weiterläuft.
+eigentliche Aufgabe („ausräumen").
+
+Deren Idents und Texte werden **aus dem Gerätenamen abgeleitet**, solange die
+Felder leer bleiben — eine Instanz namens „Trockner" erzeugt also von selbst
+`TROCKNER_LAEUFT`, `TROCKNER_FERTIG` und „Trockner ausräumen". Das ist Absicht:
+So bekommt jede Instanz eigene Kennungen, und zwei Geräte können nicht auf
+derselben Aufgabe kollidieren. Wer eine bestehende Visualisierung
+weiterverwenden will, trägt den vorhandenen Ident (etwa `WMFERTIG`) explizit
+ein — ein gesetzter Wert hat immer Vorrang vor der Ableitung.
+
+> **Wichtig bei mehreren Geräten:** Verlass dich nicht darauf, die Idents später
+> zu ändern — vergisst du es bei der zweiten Instanz, schreiben beide Geräte auf
+> dieselbe Aufgabe. Entweder die Felder leer lassen (dann sorgt der Gerätename
+> für eindeutige Kennungen) oder von Anfang an unterschiedliche Idents eintragen.
 
 Über „Erinnerung unterdrücken, solange diese Variable gilt" lässt sich ein
 zweites Gerät berücksichtigen — etwa keine Erinnerung an die Waschmaschine,

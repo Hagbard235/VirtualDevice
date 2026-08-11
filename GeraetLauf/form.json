@@ -160,33 +160,37 @@
           "caption": "Waehrend des Laufs eine Kachel anzeigen"
         },
         {
+          "type": "Label",
+          "caption": "Idents und Texte werden aus dem Geraetenamen abgeleitet, wenn sie leer bleiben (z.B. Trockner -> TROCKNER_LAEUFT, TROCKNER_FERTIG, 'Trockner ausraeumen'). So bekommt jede Instanz eigene Werte und zwei Geraete kollidieren nicht. Fuer eine bestehende Visualisierung hier den vorhandenen Ident eintragen, etwa WMFERTIG."
+        },
+        {
           "type": "ValidationTextBox",
           "name": "IdentRunning",
-          "caption": "Ident der Laeuft-Aufgabe",
-          "width": "250px"
+          "caption": "Ident Laeuft-Aufgabe (leer = automatisch)",
+          "width": "300px"
         },
         {
           "type": "ValidationTextBox",
           "name": "TextRunning",
-          "caption": "Text der Laeuft-Aufgabe",
+          "caption": "Text Laeuft-Aufgabe (leer = automatisch)",
           "width": "400px"
         },
         {
           "type": "ValidationTextBox",
           "name": "IdentDone",
-          "caption": "Ident der Fertig-Aufgabe",
-          "width": "250px"
+          "caption": "Ident Fertig-Aufgabe (leer = automatisch)",
+          "width": "300px"
         },
         {
           "type": "ValidationTextBox",
           "name": "TextDone",
-          "caption": "Text der Fertig-Aufgabe",
+          "caption": "Text Fertig-Aufgabe (leer = automatisch)",
           "width": "400px"
         },
         {
           "type": "ValidationTextBox",
           "name": "SpeechDone",
-          "caption": "Gesprochener Text",
+          "caption": "Gesprochener Text (leer = automatisch)",
           "width": "400px"
         },
         {
