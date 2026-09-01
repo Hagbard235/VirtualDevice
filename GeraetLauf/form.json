@@ -5,10 +5,23 @@
       "caption": "Erkennt am Stromverbrauch, ob das Geraet laeuft oder fertig ist, schaetzt die Restlaufzeit und meldet die Aufgaben an die ToDo-Zentrale. Eine Instanz je Geraet."
     },
     {
+      "type": "Select",
+      "name": "DeviceType",
+      "caption": "Geraetetyp",
+      "width": "300px",
+      "options": [
+        { "caption": "Waschmaschine", "value": 0 },
+        { "caption": "Trockner", "value": 1 },
+        { "caption": "Geschirrspueler", "value": 2 },
+        { "caption": "Backofen", "value": 3 },
+        { "caption": "Andere", "value": 99 }
+      ]
+    },
+    {
       "type": "ValidationTextBox",
-      "name": "DeviceName",
-      "caption": "Bezeichnung des Geraets",
-      "width": "300px"
+      "name": "CustomName",
+      "caption": "Bei 'Andere' voller Name, sonst optionaler Zusatz (z.B. 'Keller' fuer eine zweite Waschmaschine)",
+      "width": "500px"
     },
     {
       "type": "ExpansionPanel",

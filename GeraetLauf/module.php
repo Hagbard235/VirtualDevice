@@ -31,10 +31,27 @@ class GeraetLauf extends IPSModule {
     const SPEAK_NEU        = 1;
     const SPEAK_ERINNERUNG = 2;
 
+    // Vorausgewaehlte Geraetetypen. 99 = "Andere" (freier Name in CustomName
+    // ist dann Pflicht, sonst optionaler Zusatz fuer ein zweites Geraet
+    // desselben Typs, z.B. "Waschmaschine" + "Keller").
+    const DEVICE_TYPE_CUSTOM = 99;
+    const DEVICE_TYPES = [
+        0 => "Waschmaschine",
+        1 => "Trockner",
+        2 => "Geschirrspueler",
+        3 => "Backofen",
+    ];
+
     public function Create() {
         parent::Create();
 
-        $this->RegisterPropertyString("DeviceName", "Waschmaschine");
+        // Bewusst kein freies Namensfeld allein: eine Auswahl bekannter
+        // Geraetetypen plus optionaler Zusatzname verhindert, dass eine neue
+        // Instanz weiterhin mit dem Namen eines anderen Geraets vorbelegt
+        // startet. Default "Andere" mit leerem Zusatz macht eine frische,
+        // unkonfigurierte Instanz sofort sichtbar.
+        $this->RegisterPropertyInteger("DeviceType", self::DEVICE_TYPE_CUSTOM);
+        $this->RegisterPropertyString("CustomName", "");
         $this->RegisterPropertyInteger("PowerID", 0);
         $this->RegisterPropertyInteger("DoorID", 0);
         $this->RegisterPropertyBoolean("DoorOpenWhenFalse", true);
@@ -526,8 +543,21 @@ class GeraetLauf extends IPSModule {
     }
 
     private function DeviceName(): string {
-        $name = trim($this->ReadPropertyString("DeviceName"));
-        return $name !== "" ? $name : "Geraet";
+        $type = $this->ReadPropertyInteger("DeviceType");
+        $custom = trim($this->ReadPropertyString("CustomName"));
+
+        if ($type === self::DEVICE_TYPE_CUSTOM) {
+            // "Andere": der freie Name ist die einzige Quelle. Bewusst kein
+            // stiller Fallback auf "Waschmaschine" o.ae. - eine unbenannte
+            // "Andere"-Instanz soll als "Geraet" auffallen, nicht heimlich
+            // wie ein anderes Geraet aussehen.
+            return $custom !== "" ? $custom : "Geraet";
+        }
+
+        $base = self::DEVICE_TYPES[$type] ?? "Geraet";
+        // Bei einem bekannten Typ ist der Zusatzname optional, z.B. fuer ein
+        // zweites Geraet desselben Typs ("Waschmaschine Keller").
+        return $custom !== "" ? $base . " " . $custom : $base;
     }
 
     /**
