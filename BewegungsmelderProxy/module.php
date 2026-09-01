@@ -12,6 +12,13 @@ class BewegungsmelderProxy extends IPSModule {
     // gewartet wird. MQTT- und Eltako-Aktoren brauchen rund eine Sekunde.
     const SWITCH_TIMEOUT = 5.0;
 
+    // Deckel für den AutoCycleActive-Nachtrigger (siehe CheckLogic/IsFarTooBright):
+    // "hell wegen uns" gilt nur bis zu diesem Vielfachen der Schaltschwelle. Darüber
+    // ist es zu hell, um noch plausibel von der eigenen Lampe zu stammen (z.B. echtes
+    // Tageslicht bei Dauerpräsenz) - der Nachtrigger wird dann sowohl beim (Wieder-)
+    // Einschalten (CheckLogic) als auch bei der Timer-Verlängerung (TimerEvent) gesperrt.
+    const NACHTRIGGER_CAP_FACTOR = 1.5;
+
     public function Create() {
         parent::Create();
 
@@ -158,6 +165,7 @@ class BewegungsmelderProxy extends IPSModule {
         // Nach einem IPS-Neustart stellt Symcon den zuletzt gespeicherten Wert wieder her,
         // der nicht zwingend zum echten Licht passt. Ein stehengebliebenes "AN" würde in
         // CheckLogic die Helligkeitsprüfung überbrücken.
+        $actualState = false;
         if ($lightID > 0 && IPS_VariableExists($lightID)) {
             $actualState = GetValueBoolean($lightID);
             if ($this->GetValue("Status") !== $actualState) {
@@ -168,6 +176,20 @@ class BewegungsmelderProxy extends IPSModule {
         $this->WriteAttributeBoolean("AutoCycleActive", false);
         $this->SetBuffer("PendingSwitch", "");
         $this->SetTimerInterval("VerifyTimer", 0);
+
+        // Sicherheitsnetz: Licht ist an, aber kein Zyklus/Timer bekannt (z.B. nach einem
+        // Instanz- oder Kernel-Neustart, während das Licht brannte - RegisterTimer setzt
+        // dann wieder auf 0). Ohne diesen Reset kommt so lange kein neuer Nachlauf-Zyklus
+        // mehr zustande, bis irgendwann ein Trigger die Bedingungen von CheckLogic erfüllt -
+        // im Extremfall nie. Wir behandeln ein unerklärt brennendes Licht daher wie ein
+        // frisches manuelles Einschalten: voller Timer, Zyklus als aktiv markiert.
+        $mode = $this->GetValue("Mode");
+        if ($actualState && ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX)) {
+            $duration = $this->ReadPropertyInteger("Duration") * 1000;
+            $this->SendDebug("ApplyChanges", "Licht war unerwartet an, kein Zyklus aktiv. Starte Sicherheits-Timer: " . ($duration / 1000) . "s", 0);
+            $this->WriteAttributeBoolean("AutoCycleActive", true);
+            $this->SetTimerInterval("AutoOffTimer", $duration);
+        }
 
         // Helper Scripte (An/Aus) anlegen oder aktualisieren
         $this->CreateHelperScripts();
@@ -398,7 +420,15 @@ class BewegungsmelderProxy extends IPSModule {
             // Bewusst NICHT die Status-Variable: die kann vom echten Gerät abweichen und
             // würde die Helligkeitsprüfung dann dauerhaft aushebeln.
             // CheckLogic berücksichtigt jetzt den Trigger-Sensor für lokale Helligkeit
-            if ($this->IsDarkEnough($triggerSensorID) || $this->ReadAttributeBoolean("AutoCycleActive")) {
+            //
+            // Deckel: "hell wegen uns" gilt nur bis NACHTRIGGER_CAP_FACTOR * Schaltschwelle.
+            // Betrifft NUR das (Wieder-)Einschalten aus dem Aus-Zustand heraus, wenn
+            // AutoCycleActive fälschlich noch true ist (z.B. nach einem Reload, siehe
+            // Sicherheitsnetz in ApplyChanges). Ein bereits laufender Zyklus mit echter
+            // Dauerpräsenz wird davon NICHT beendet - das übernimmt weiterhin ausschließlich
+            // TimerEvent anhand von Bewegung, bewusst ohne Helligkeitsprüfung.
+            if ($this->IsDarkEnough($triggerSensorID) ||
+                ($this->ReadAttributeBoolean("AutoCycleActive") && !$this->IsFarTooBright($triggerSensorID))) {
                 $shouldSwitch = true;
             }
         }
@@ -469,7 +499,64 @@ class BewegungsmelderProxy extends IPSModule {
 
         // Fallback: Immer dunkel annehmen
         $this->SendDebug("IsDarkEnough", "No sources defined. Assuming DARK.", 0);
-        return true; 
+        return true;
+    }
+
+    /**
+     * Deckelt den AutoCycleActive-Nachtrigger (siehe CheckLogic und TimerEvent):
+     * "hell wegen uns" darf echtes Tageslicht nicht dauerhaft überstimmen. Liefert true,
+     * wenn eine gemessene Helligkeit klar über der Schaltschwelle liegt (Vielfaches
+     * NACHTRIGGER_CAP_FACTOR) oder eine externe Dunkelheits-Quelle explizit "hell" meldet.
+     * Ohne Quelle konservativ false (kein zusätzlicher Deckel) - bestehende Konfigurationen
+     * ohne Helligkeitsquelle verhalten sich dadurch unverändert.
+     */
+    private function IsFarTooBright($triggerSensorID = 0) {
+        $threshold = $this->GetValue("ThresholdVar");
+        $cap = $threshold * self::NACHTRIGGER_CAP_FACTOR;
+
+        // Zonenspezifische Helligkeit hat Vorrang, analog zu IsDarkEnough.
+        if ($triggerSensorID > 0) {
+            $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
+            if (is_array($motionSensors)) {
+                foreach ($motionSensors as $sensor) {
+                    if ($sensor['VariableID'] == $triggerSensorID) {
+                        if (isset($sensor['BrightnessVariableID']) && $sensor['BrightnessVariableID'] > 0) {
+                            $bID = $sensor['BrightnessVariableID'];
+                            if (IPS_VariableExists($bID)) {
+                                $lux = GetValue($bID);
+                                $tooBright = ($lux > $cap);
+                                $this->SendDebug("IsFarTooBright", "Zone ($triggerSensorID) Brightness ($bID): $lux > Cap ($cap) ? " . ($tooBright ? "YES" : "NO"), 0);
+                                return $tooBright;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Externe Dunkelheits-Quelle: ein explizites "hell" ist ein staerkeres Signal als
+        // jeder Lux-Vergleich und deckelt ebenfalls.
+        $extDarkID = $this->ReadPropertyInteger("SourceIsDarkID");
+        if ($extDarkID > 0 && IPS_VariableExists($extDarkID)) {
+            $val = GetValueBoolean($extDarkID);
+            if ($this->ReadPropertyBoolean("InvertIsDark")) {
+                $val = !$val;
+            }
+            $this->SendDebug("IsFarTooBright", "External Var ($extDarkID) says: " . ($val ? "Dark" : "Bright") . " -> tooBright=" . ($val ? "NO" : "YES"), 0);
+            return !$val; // $val === true bedeutet dunkel
+        }
+
+        $luxID = $this->ReadPropertyInteger("SourceBrightnessID");
+        if ($luxID > 0 && IPS_VariableExists($luxID)) {
+            $lux = GetValue($luxID);
+            $tooBright = ($lux > $cap);
+            $this->SendDebug("IsFarTooBright", "Lux: $lux > Cap: $cap ? " . ($tooBright ? "YES" : "NO"), 0);
+            return $tooBright;
+        }
+
+        // Keine Quelle -> kein zusaetzlicher Deckel.
+        return false;
     }
 
     private function SwitchLight($state) {
@@ -505,9 +592,13 @@ class BewegungsmelderProxy extends IPSModule {
 
     public function TimerEvent() {
         $this->SendDebug("Timer", "AutoOffTimer Expired", 0);
-        
+
         // Safety Check: Ist noch Bewegung da?
-        // Wenn der Sensor noch "True" meldet (Dauerpräsenz), darf das Licht nicht ausgehen.
+        // Wenn der Sensor noch "True" meldet (Dauerpräsenz), darf das Licht nicht ausgehen -
+        // bewusst UNABHAENGIG von der Helligkeit. Der Deckel (IsFarTooBright, siehe
+        // CheckLogic) betrifft nur die Entscheidung, ob aus dem Aus-Zustand heraus wieder
+        // eingeschaltet werden darf - ein laufender Zyklus mit echter Dauerpräsenz soll
+        // dadurch nicht abgewürgt werden.
         if ($this->GetValue("Motion")) {
              $duration = $this->ReadPropertyInteger("Duration") * 1000;
              $this->SendDebug("Timer", "Motion still active! Extending timer by " . ($duration/1000) . "s", 0);
