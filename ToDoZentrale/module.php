@@ -128,6 +128,8 @@ class ToDoZentrale extends IPSModule {
      *     "prio"        => 2,
      *     "quittierung" => 1,
      *     "sprache"     => "Die Waschmaschine ist fertig",
+     *     "sprachziele" => ["uv"],
+     *     "sprachEvent" => "washer_done",
      *     "clearVar"    => 21715, "clearMode" => 5,
      *     "erinnerung"  => 1800,
      *     "sprechen"    => 7
@@ -169,6 +171,10 @@ class ToDoZentrale extends IPSModule {
             'remindMax'   => (int)$this->Opt($opt, 'erinnerungMax', $existing, 'remindMax', 0),
             'speakOn'     => (int)$this->Opt($opt, 'sprechen', $existing, 'speakOn', self::SPEAK_NEU),
             'voiceTargets' => $this->Opt($opt, 'sprachziele', $existing, 'voiceTargets', []),
+            // Kennung einer vordefinierten Ansage beim Sprachziel, z.B. ein
+            // Event-Typ von Ultimate Voice. Ziele, die freien Text sprechen,
+            // ignorieren das Feld - sie bekommen wie bisher 'Text'.
+            'speechEvent' => (string)$this->Opt($opt, 'sprachEvent', $existing, 'speechEvent', ""),
             'created'     => $existing ? $existing['created'] : time(),
             'remindCount' => $existing ? $existing['remindCount'] : 0,
             'lastReminder' => $existing ? $existing['lastReminder'] : 0,
@@ -240,7 +246,7 @@ class ToDoZentrale extends IPSModule {
         $this->SendDebug("Acknowledge", "'$Ident' erledigt", 0);
 
         if ($item['speakOn'] & self::SPEAK_ERLEDIGT) {
-            $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item));
+            $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item), false);
         }
 
         unset($items[$Ident]);
@@ -337,7 +343,7 @@ class ToDoZentrale extends IPSModule {
                 'clearVarID' => 0, 'clearMode' => self::CMP_WAHR, 'clearValue' => "",
                 'suppressVarID' => 0, 'suppressMode' => self::CMP_WAHR, 'suppressValue' => "",
                 'remindInterval' => 0, 'remindMax' => 0,
-                'speakOn' => 0, 'voiceTargets' => [],
+                'speakOn' => 0, 'voiceTargets' => [], 'speechEvent' => "",
                 'created' => time(), 'remindCount' => 0, 'lastReminder' => 0, 'snoozeUntil' => 0
             ];
             $rendered[$ident] = $childID;
@@ -397,7 +403,7 @@ class ToDoZentrale extends IPSModule {
             if ($this->ConditionMet($item['clearVarID'], $item['clearMode'], $item['clearValue'])) {
                 $this->SendDebug("Cycle", "'$ident' automatisch erledigt (Bedingung erfuellt)", 0);
                 if ($item['speakOn'] & self::SPEAK_ERLEDIGT) {
-                    $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item));
+                    $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item), false);
                 }
                 unset($items[$ident]);
                 $changed = true;
@@ -676,15 +682,24 @@ class ToDoZentrale extends IPSModule {
         return $item['speech'] !== "" ? $item['speech'] : $item['text'];
     }
 
-    private function SpeakItem(array $item, string $text) {
+    /**
+     * @param bool $useEvent Die hinterlegte Ansagekennung mitgeben. Fuer die
+     *                       Erledigt-Meldung falsch: die Kennung beschreibt
+     *                       das Ereignis ("Waschmaschine fertig"), nicht das
+     *                       Abhaken - ein Ziel mit festen Ansagen wuerde sonst
+     *                       beim Quittieren erneut "ist fertig" sagen.
+     */
+    private function SpeakItem(array $item, string $text, bool $useEvent = true) {
         if ($item['priority'] < $this->ReadPropertyInteger("VoiceMinPriority")) {
             $this->SendDebug("Sprache", "Unterdrueckt (Prioritaet zu niedrig): $text", 0);
             return;
         }
         $targets = is_array($item['voiceTargets']) ? $item['voiceTargets'] : [];
+        // Aeltere gespeicherte Aufgaben kennen das Feld noch nicht.
+        $event = ($useEvent && isset($item['speechEvent'])) ? (string)$item['speechEvent'] : "";
         // Der Aufgabentext dient als Titel - er ist kurz und benennt die Sache,
         // waehrend der gesprochene Text ein ganzer Satz sein darf.
-        $this->SpeakRaw($text, $targets, true, $item['text']);
+        $this->SpeakRaw($text, $targets, true, $item['text'], $event);
     }
 
     /**
@@ -692,8 +707,11 @@ class ToDoZentrale extends IPSModule {
      *                             TODO_Speak melden bewusst auch nachts.
      * @param string $title        Ueberschrift; leer bedeutet, dass der je Ziel
      *                             hinterlegte Titel verwendet wird.
+     * @param string $event        Kennung einer vordefinierten Ansage, die dem
+     *                             Zielskript als 'Event' mitgegeben wird. Ziele,
+     *                             die freien Text sprechen, ignorieren sie.
      */
-    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "") {
+    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "", string $event = "") {
         $text = trim($text);
         if ($text === "") return;
 
@@ -728,7 +746,9 @@ class ToDoZentrale extends IPSModule {
 
             if ($scriptID > 0 && IPS_ScriptExists($scriptID)) {
                 // Parameternamen bewusst wie im bisherigen Ansageskript.
-                @IPS_RunScriptEx($scriptID, ['Titel' => $useTitle, 'Text' => $text]);
+                // 'Event' kam spaeter dazu und ist meist leer - ein Skript, das
+                // den Parameter nicht kennt, ignoriert ihn folgenlos.
+                @IPS_RunScriptEx($scriptID, ['Titel' => $useTitle, 'Text' => $text, 'Event' => $event]);
                 $delivered++;
             } elseif ($variableID > 0 && IPS_VariableExists($variableID)) {
                 @RequestAction($variableID, $text);

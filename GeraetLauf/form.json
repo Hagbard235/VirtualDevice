@@ -207,6 +207,18 @@
           "width": "400px"
         },
         {
+          "type": "ValidationTextBox",
+          "name": "VoiceTargets",
+          "caption": "Sprachziele der ToDo-Zentrale, kommasepariert (leer = alle)",
+          "width": "400px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "VoiceEvent",
+          "caption": "Kennung der Ansage bei diesen Zielen (leer = freier Text)",
+          "width": "400px"
+        },
+        {
           "type": "Select",
           "name": "DonePriority",
           "caption": "Prioritaet der Fertig-Aufgabe",

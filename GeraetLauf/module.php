@@ -84,6 +84,13 @@ class GeraetLauf extends IPSModule {
         $this->RegisterPropertyString("TextRunning", "");
         $this->RegisterPropertyString("TextDone", "");
         $this->RegisterPropertyString("SpeechDone", "");
+        // Sprachziele der ToDo-Zentrale, kommasepariert. Leer = alle aktiven
+        // Ziele, wie bisher. Gezielt gesetzt, damit ein Ziel mit festen
+        // Ansagen (z.B. Ultimate Voice) nur die Geraete bekommt, die es kennt.
+        $this->RegisterPropertyString("VoiceTargets", "");
+        // Kennung der vordefinierten Ansage bei diesen Zielen, z.B. der
+        // Event-Typ "washer_done". Leer = das Ziel spricht den freien Text.
+        $this->RegisterPropertyString("VoiceEvent", "");
         $this->RegisterPropertyInteger("DonePriority", 2);
         $this->RegisterPropertyInteger("RemindMinutes", 30);
         $this->RegisterPropertyInteger("RemindMax", 0);
@@ -315,6 +322,8 @@ class GeraetLauf extends IPSModule {
             'farbe'       => "ROT",
             'schalter'    => "...Fertig!...",
             'sprache'     => $this->SpeechDone(),
+            'sprachziele' => $this->VoiceTargetKeys(),
+            'sprachEvent' => trim($this->ReadPropertyString("VoiceEvent")),
             'erinnerung'  => $this->ReadPropertyInteger("RemindMinutes") * 60,
             'erinnerungMax' => $this->ReadPropertyInteger("RemindMax"),
             'sprechen'    => self::SPEAK_NEU | self::SPEAK_ERINNERUNG
@@ -535,6 +544,20 @@ class GeraetLauf extends IPSModule {
     private function TextDone(): string {
         $text = trim($this->ReadPropertyString("TextDone"));
         return $text !== "" ? $text : $this->DeviceName() . " ausraeumen";
+    }
+
+    /**
+     * Die kommaseparierte Eingabe in die Liste, die die ToDo-Zentrale als
+     * 'sprachziele' erwartet. Leer bleibt leer - das heisst dort "alle
+     * aktiven Ziele" und ist das bisherige Verhalten.
+     */
+    private function VoiceTargetKeys(): array {
+        $keys = [];
+        foreach (explode(",", $this->ReadPropertyString("VoiceTargets")) as $key) {
+            $key = trim($key);
+            if ($key !== "") $keys[] = $key;
+        }
+        return $keys;
     }
 
     private function SpeechDone(): string {
