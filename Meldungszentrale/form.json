@@ -225,12 +225,12 @@
     {
       "type": "Button",
       "caption": "Journal (letzte Eintraege)",
-      "onClick": "$j = json_decode(MZ_Journal($id), true); foreach (array_slice($j, -25) as $e) { echo date(\"d.m. H:i:s\", $e[\"zeit\"]) . \"  \" . json_encode($e) . \"\\n\"; }"
+      "onClick": "$j = json_decode(MZ_Journal($id, \"\"), true); foreach (array_slice($j, -25) as $e) { echo date(\"d.m. H:i:s\", $e[\"zeit\"]) . \"  \" . json_encode($e) . \"\\n\"; }"
     },
     {
       "type": "Button",
       "caption": "Offene Meldungen",
-      "onClick": "echo MZ_Aktuell($id);"
+      "onClick": "echo MZ_Aktuell($id, \"\");"
     }
   ],
   "status": [

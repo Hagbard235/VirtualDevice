@@ -566,7 +566,14 @@ class Meldungszentrale extends IPSModule {
         $m = $this->MeldungLesen($meldungID);
         if ($m === null) return;
         $sid = (int)$k["ScriptID"];
-        if ($sid <= 0 || !IPS_ScriptExists($sid)) {
+        if ($sid <= 0) {
+            // Ein Kanal ohne Adapterskript ist der modulinterne Anzeigekanal:
+            // Das Modul rendert die Liste selbst, es gibt nichts zuzustellen.
+            // Ohne diesen Fall liefe die Anzeige in eine Retry-Schleife.
+            $this->Zustellstatus($meldungID . "|" . $k["Key"], self::AUFTRAG_BESTAETIGT, "");
+            return;
+        }
+        if (!IPS_ScriptExists($sid)) {
             $this->Zustellstatus($meldungID . "|" . $k["Key"], self::AUFTRAG_FEHLER, "kein_adapter");
             return;
         }
@@ -611,7 +618,7 @@ class Meldungszentrale extends IPSModule {
     // Zustellstatus, Aktionen, Rueckzug
     // ==================================================================
 
-    public function Zustellstatus(string $ZustellauftragID, string $Status, string $Fehlercode = ""): bool {
+    public function Zustellstatus(string $ZustellauftragID, string $Status, string $Fehlercode): bool {
         $teile = explode("|", $ZustellauftragID, 2);
         if (count($teile) != 2) return false;
         list($meldungID, $kanal) = $teile;
@@ -751,7 +758,7 @@ class Meldungszentrale extends IPSModule {
         return true;
     }
 
-    public function Journal(string $Filter = ""): string {
+    public function Journal(string $Filter): string {
         $zeilen = [];
         foreach ($this->JournalSegmente() as $datei) {
             $fh = @fopen($datei, "r");
@@ -774,7 +781,7 @@ class Meldungszentrale extends IPSModule {
      * Empfaenger serverseitig aus einer authentifizierten Identitaet
      * ableiten, nie aus einem Parameter des Aufrufers.
      */
-    public function Aktuell(string $EmpfaengerKey = ""): string {
+    public function Aktuell(string $EmpfaengerKey): string {
         $out = [];
         foreach ($this->OffeneMeldungen() as $m) {
             if (time() > $m["gueltigBis"]) continue;
