@@ -641,11 +641,9 @@ class Meldungszentrale extends IPSModule {
     }
 
     /**
-     * Aktion ausloesen. Zwei Sperren mit verschiedenen Aufgaben: Die
-     * Gruppensperre sichert die fachliche Exklusivitaet ("Oeffnen" und
-     * "Ignorieren" duerfen nicht beide wirken), der Store-Lock die
-     * Dateiintegritaet gegen jeden anderen Schreiber. Reihenfolge immer
-     * erst Gruppe, dann Store - sonst drohen Deadlocks.
+     * Aktion ueber einen externen Kanal ausloesen. Der Token weist nach,
+     * dass der Aufruf zu genau dieser Meldung, Aktion und diesem Kanal
+     * gehoert - er ist die einzige Berechtigung, die ein Kanal mitbekommt.
      */
     public function Ausloesen(string $MeldungID, string $Aktionskennung, string $Token): bool {
         $m = $this->MeldungLesen($MeldungID);
@@ -661,17 +659,36 @@ class Meldungszentrale extends IPSModule {
                                      "aktion" => $Aktionskennung, "grund" => "token"]);
             return false;
         }
+        return $this->AktionIntern($MeldungID, $Aktionskennung, $kanal);
+    }
+
+    /**
+     * Kern der Aktionsausfuehrung, ohne Tokenpruefung.
+     *
+     * Zwei Sperren mit verschiedenen Aufgaben: Die Gruppensperre sichert die
+     * fachliche Exklusivitaet - "Oeffnen" und "Ignorieren" duerfen nicht
+     * beide wirken. Der Store-Lock sichert die Dateiintegritaet gegen jeden
+     * anderen Schreiber, auch gegen Timer und Zustellstatus. Reihenfolge
+     * immer erst Gruppe, dann Store, sonst drohen Deadlocks.
+     */
+    private function AktionIntern(string $MeldungID, string $Aktionskennung, string $kanal): bool {
+        $m = $this->MeldungLesen($MeldungID);
+        if ($m === null) return false;
+        $idx = null;
+        foreach ($m["aktionen"] as $i => $a) if ($a["aktionskennung"] === $Aktionskennung) $idx = $i;
+        if ($idx === null) return false;
 
         $gruppe = $m["aktionen"][$idx]["gruppe"];
         $gLock = "MZ_" . $MeldungID . "_" . $gruppe;
         if (!IPS_SemaphoreEnter($gLock, self::LOCK_MS)) return false;
+        $erfolg = false;
         try {
             $sLock = $this->StoreLockName($MeldungID);
             if (!IPS_SemaphoreEnter($sLock, self::LOCK_MS)) return false;
             try {
                 $m = $this->MeldungLesen($MeldungID);
                 if ($m === null) return false;
-                // Eine andere Aktion derselben Gruppe darf nicht schon laufen.
+                // Keine zweite Aktion derselben Gruppe darf schon gelaufen sein.
                 foreach ($m["aktionen"] as $a) {
                     if ($a["gruppe"] === $gruppe && $a["zustand"] !== self::AKTION_OFFEN
                         && $a["zustand"] !== self::AKTION_ABGELAUFEN) {
@@ -690,15 +707,14 @@ class Meldungszentrale extends IPSModule {
                 IPS_SemaphoreLeave($sLock);
             }
 
-            // Das Aktionsskript laeuft bewusst OHNE Store-Lock - es kann
+            // Das Aktionsskript laeuft bewusst OHNE Store-Lock: Es kann
             // beliebig lange dauern und wuerde sonst alles blockieren.
             $def = $this->AktionFinden($Aktionskennung);
-            $erfolg = false;
             if ($def !== null && (int)$def["ScriptID"] > 0 && IPS_ScriptExists((int)$def["ScriptID"])) {
                 try {
-                    $r = IPS_RunScriptWaitEx((int)$def["ScriptID"],
-                                             ["MeldungID" => $MeldungID, "Aktion" => $Aktionskennung]);
-                    $erfolg = (trim((string)$r) !== "FEHLER");
+                    $rueck = IPS_RunScriptWaitEx((int)$def["ScriptID"],
+                                                 ["MeldungID" => $MeldungID, "Aktion" => $Aktionskennung]);
+                    $erfolg = (trim((string)$rueck) !== "FEHLER");
                 } catch (\Throwable $e) {
                     $erfolg = false;
                 }
@@ -712,7 +728,8 @@ class Meldungszentrale extends IPSModule {
                         if ($erfolg) {
                             $m["aktionen"][$idx]["zustand"] = self::AKTION_ERFOLG;
                             $m["aktionen"][$idx]["tokens"] = [];
-                            // Nur Alternativen DERSELBEN Gruppe beenden.
+                            // Nur Alternativen DERSELBEN Gruppe beenden -
+                            // unabhaengige Aktionen bleiben moeglich.
                             foreach ($m["aktionen"] as $i => $a) {
                                 if ($i != $idx && $a["gruppe"] === $gruppe) {
                                     $m["aktionen"][$i]["zustand"] = self::AKTION_ABGELAUFEN;
@@ -721,8 +738,8 @@ class Meldungszentrale extends IPSModule {
                             }
                         } else {
                             $retry = $def !== null && $def["RetryBeiSicheremFehler"];
-                            // Token bleibt gueltig, sonst waere ein Retry
-                            // durch den Anwender gar nicht moeglich.
+                            // Token bleibt gueltig, sonst waere ein erneuter
+                            // Versuch durch den Anwender gar nicht moeglich.
                             $m["aktionen"][$idx]["zustand"] = $retry ? self::AKTION_OFFEN : self::AKTION_FEHLER;
                         }
                         $this->MeldungSchreiben($m);
@@ -735,8 +752,9 @@ class Meldungszentrale extends IPSModule {
             IPS_SemaphoreLeave($gLock);
         }
 
-        $this->JournalAnhaengen(["typ" => "aktion", "meldungID" => $MeldungID, "aktion" => $Aktionskennung,
-                                 "kanal" => $kanal, "ergebnis" => $erfolg ? "erfolgreich" : "fehlgeschlagen"]);
+        $this->JournalAnhaengen(["typ" => "aktion", "meldungID" => $MeldungID,
+                                 "aktion" => $Aktionskennung, "kanal" => $kanal,
+                                 "ergebnis" => $erfolg ? "erfolgreich" : "fehlgeschlagen"]);
         if ($erfolg) $this->AktionZurueckziehen($MeldungID);
         $this->NachLaufAktualisieren();
         return $erfolg;
@@ -844,6 +862,7 @@ class Meldungszentrale extends IPSModule {
         }
         $this->SetValue("OffeneMeldungen", $anzahl);
         $this->AnzeigeRendern();
+        $this->AnzeigeAktualisieren();
 
         if ($naechster === 0) { $this->SetTimerInterval("Faellig", 0); return; }
         $sek = max(1, $naechster - time() + 1);
@@ -1272,8 +1291,85 @@ class Meldungszentrale extends IPSModule {
     }
 
     // ==================================================================
-    // Anzeige
+    // Anzeige (HTML-SDK)
     // ==================================================================
+
+    /**
+     * Eigene Objektdarstellung. Symcon laedt dieses HTML und ruft darin
+     * handleMessage() mit den Daten aus UpdateVisualizationValue auf.
+     */
+    public function GetVisualizationTile() {
+        $html = @file_get_contents(__DIR__ . "/module.html");
+        if ($html === false) return "<p>Darstellung nicht gefunden.</p>";
+        // Erststand direkt einbetten, damit die Kachel schon vor der ersten
+        // Aktualisierung etwas anzeigt.
+        return $html . "<script>handleMessage(" . $this->AnzeigeDaten() . ");</script>";
+    }
+
+    /**
+     * Rueckkanal der Darstellung. requestAction() im HTML landet hier.
+     *
+     * Bewusst OHNE Token: Der Aufruf kommt ueber die bestehende, vom Symcon
+     * Kern hergestellte Verbindung der Visualisierung. Ein Token waere hier
+     * nur Zierde - es muesste im HTML stehen und damit jedem sichtbar sein,
+     * der die Darstellung ohnehin schon oeffnen kann. Diese Aktion ist damit
+     * genau so gut geschuetzt wie jeder andere Schalter derselben
+     * Visualisierung, aber nicht besser. Externe Kanaele nutzen weiterhin
+     * kanalbezogene Tokens ueber den WebHook.
+     */
+    public function RequestAction($Ident, $Value) {
+        if ($Ident !== "aktion") {
+            parent::RequestAction($Ident, $Value);
+            return;
+        }
+        $teile = explode("|", (string)$Value, 2);
+        if (count($teile) != 2) return;
+        list($meldungID, $aktion) = $teile;
+
+        $m = $this->MeldungLesen($meldungID);
+        if ($m === null) { $this->AnzeigeAktualisieren(); return; }
+
+        // Die Darstellung ist ein interner Kanal: Sie darf nur Aktionen
+        // ausloesen, die ueberhaupt an sie ausgeliefert werden duerften.
+        $def = $this->AktionFinden($aktion);
+        if ($def === null) { $this->AnzeigeAktualisieren(); return; }
+        if (trim($def["ErlaubteKanaele"]) !== ""
+            && !in_array("_darstellung", $this->Liste($def["ErlaubteKanaele"]))) {
+            $this->JournalAnhaengen(["typ" => "aktion_abgewiesen", "meldungID" => $meldungID,
+                                     "aktion" => $aktion, "grund" => "kanal_nicht_erlaubt"]);
+            $this->AnzeigeAktualisieren();
+            return;
+        }
+        $this->AktionIntern($meldungID, $aktion, "_darstellung");
+        $this->AnzeigeAktualisieren();
+    }
+
+    /** Offene Meldungen als JSON fuer die Darstellung. */
+    private function AnzeigeDaten(): string {
+        $liste = [];
+        foreach ($this->OffeneMeldungen() as $m) {
+            if (time() > $m["gueltigBis"]) continue;
+            // Die Darstellung ist ein oeffentlicher Kanal ohne nachgewiesene
+            // Empfaengerbindung - vertrauliche Inhalte gehoeren nicht hinein.
+            if ($m["vertraulich"]) continue;
+            $aktionen = [];
+            foreach ($m["aktionen"] as $a) {
+                $aktionen[] = ["aktionskennung" => $a["aktionskennung"],
+                               "beschriftung"   => $a["beschriftung"],
+                               "zustand"        => $a["zustand"]];
+            }
+            $liste[] = ["meldungID" => $m["meldungID"], "titel" => $m["titel"],
+                        "text" => $m["text"], "ereignis" => $m["ereignis"],
+                        "dringlichkeit" => $m["dringlichkeit"], "erstellt" => $m["erstellt"],
+                        "gueltigBis" => $m["gueltigBis"], "aktionen" => $aktionen];
+        }
+        usort($liste, function ($a, $b) { return $b["erstellt"] <=> $a["erstellt"]; });
+        return json_encode(["meldungen" => $liste], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function AnzeigeAktualisieren() {
+        $this->UpdateVisualizationValue($this->AnzeigeDaten());
+    }
 
     private function AnzeigeRendern() {
         $zeilen = [];

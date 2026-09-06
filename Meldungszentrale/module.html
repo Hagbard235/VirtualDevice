@@ -1,0 +1,115 @@
+<!--
+  Darstellung der Meldungszentrale (HTML-SDK).
+
+  Der Ruecckanal laeuft ueber requestAction() und damit ueber die bestehende
+  Verbindung der Visualisierung - kein Token in einer URL, kein WebHook.
+  Die Aktion ist damit genau so gut geschuetzt wie jeder andere Schalter in
+  derselben Visualisierung, aber nicht besser: Wer sie oeffnen kann, kann
+  klicken. Fuer wirklich schutzbeduerftige Aktionen braucht es eine
+  Empfaengerbindung, siehe Konzept 15.1.
+-->
+<style>
+  .mz-liste { font-family: -apple-system, "Segoe UI", sans-serif; font-size: 14px; }
+  .mz-leer  { opacity: .6; padding: 12px 0; }
+  .mz-eintrag { padding: 8px 0; border-bottom: 1px solid rgba(128,128,128,.25); }
+  .mz-kopf { display: flex; align-items: baseline; gap: 8px; }
+  .mz-titel { font-weight: 600; }
+  .mz-zeit { margin-left: auto; opacity: .55; font-size: 12px; white-space: nowrap; }
+  .mz-text { margin-top: 2px; }
+  .mz-wichtig .mz-titel { color: #d9822b; }
+  .mz-alarm .mz-titel   { color: #d64545; }
+  .mz-aktionen { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .mz-aktionen button {
+    font: inherit; padding: 4px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid rgba(128,128,128,.5); background: rgba(128,128,128,.12);
+  }
+  .mz-aktionen button:hover:enabled { background: rgba(128,128,128,.25); }
+  .mz-aktionen button:disabled { opacity: .4; cursor: default; }
+</style>
+
+<div class="mz-liste" id="mz"></div>
+
+<script>
+  var mzDaten = { meldungen: [] };
+
+  // Wird vom Modul ueber UpdateVisualizationValue aufgerufen.
+  function handleMessage(data) {
+    try { mzDaten = (typeof data === "string") ? JSON.parse(data) : data; }
+    catch (e) { return; }
+    zeichnen();
+  }
+
+  function ausloesen(knopf, meldungID, aktion) {
+    // Sofort sperren: Ein zweiter Klick waere ohnehin wirkungslos (das Modul
+    // laesst eine Aktion je Exklusivgruppe nur einmal zu), aber der Knopf
+    // soll das auch zeigen.
+    knopf.disabled = true;
+    knopf.textContent = "…";
+    requestAction("aktion", meldungID + "|" + aktion);
+  }
+
+  function zeichnen() {
+    var jetzt = Math.floor(Date.now() / 1000);
+    var ziel = document.getElementById("mz");
+    var meldungen = (mzDaten.meldungen || []).filter(function (m) {
+      return m.gueltigBis > jetzt;
+    });
+
+    if (meldungen.length === 0) {
+      ziel.innerHTML = '<div class="mz-leer">Keine offenen Meldungen.</div>';
+      return;
+    }
+
+    var html = "";
+    meldungen.forEach(function (m) {
+      var klasse = "mz-eintrag";
+      if (m.dringlichkeit === "wichtig") klasse += " mz-wichtig";
+      if (m.dringlichkeit === "alarm")   klasse += " mz-alarm";
+
+      html += '<div class="' + klasse + '">';
+      html += '<div class="mz-kopf"><span class="mz-titel">' + esc(m.titel || m.ereignis) + "</span>";
+      html += '<span class="mz-zeit">' + zeit(m.erstellt) + "</span></div>";
+      if (m.text) html += '<div class="mz-text">' + esc(m.text) + "</div>";
+
+      var offene = (m.aktionen || []).filter(function (a) { return a.zustand === "offen"; });
+      if (offene.length > 0) {
+        html += '<div class="mz-aktionen">';
+        offene.forEach(function (a) {
+          html += '<button onclick="ausloesen(this, \'' + esc(m.meldungID) + "', '"
+                + esc(a.aktionskennung) + '\')">' + esc(a.beschriftung) + "</button>";
+        });
+        html += "</div>";
+      } else if ((m.aktionen || []).length > 0) {
+        html += '<div class="mz-aktionen"><button disabled>'
+              + esc(hinweis(m.aktionen)) + "</button></div>";
+      }
+      html += "</div>";
+    });
+    ziel.innerHTML = html;
+  }
+
+  function hinweis(aktionen) {
+    for (var i = 0; i < aktionen.length; i++) {
+      if (aktionen[i].zustand === "erfolgreich")      return "erledigt";
+      if (aktionen[i].zustand === "ausgang_unbekannt") return "Ergebnis unbekannt";
+      if (aktionen[i].zustand === "fehlgeschlagen")    return "fehlgeschlagen";
+    }
+    return "abgelaufen";
+  }
+
+  function zeit(ts) {
+    var d = new Date(ts * 1000);
+    return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + ". "
+         + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+
+  function esc(s) {
+    return String(s === undefined || s === null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // Abgelaufene Meldungen und Aktionen verschwinden clientseitig, ohne auf
+  // den Faelligkeitstimer des Moduls zu warten.
+  setInterval(zeichnen, 5000);
+</script>
