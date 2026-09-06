@@ -1,0 +1,240 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Nimmt Meldungen entgegen und entscheidet, wer sie wann ueber welchen Kanal erhaelt. Quellen kennen keine Kanaele, Kanaele treffen keine Politik. Jede angenommene Meldung wird gespeichert, bevor ein Kanal versucht wird."
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Zonen (ortsgebunden, oeffentlich)",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Ein Raum mit Lautsprechern oder Anzeigen. Das Praesenzsignal wird immer geprueft, nicht nur nachts. Es taugt alles, was im Ein-Zustand wahr oder groesser null ist."
+        },
+        {
+          "type": "List",
+          "name": "Zonen",
+          "rowCount": 6,
+          "add": true,
+          "delete": true,
+          "columns": [
+            { "caption": "Schluessel", "name": "Key", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Praesenzsignal", "name": "PraesenzVarID", "width": "220px", "add": 0, "edit": { "type": "SelectVariable" } },
+            { "caption": "Praesenz Pflicht", "name": "PraesenzPflicht", "width": "130px", "add": true, "edit": { "type": "CheckBox" } },
+            { "caption": "Nicht stoeren", "name": "DndVarID", "width": "200px", "add": 0, "edit": { "type": "SelectVariable" } },
+            { "caption": "Ruhe von", "name": "RuheVon", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Ruhe bis", "name": "RuheBis", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Empfaenger (personengebunden, privat)",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Eine Person. Ob sie ausser Haus erreichbar ist, entscheidet der Kanal (Zustellt extern), nicht die Person."
+        },
+        {
+          "type": "List",
+          "name": "Empfaenger",
+          "rowCount": 4,
+          "add": true,
+          "delete": true,
+          "columns": [
+            { "caption": "Schluessel", "name": "Key", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Anwesend", "name": "AnwesendVarID", "width": "220px", "add": 0, "edit": { "type": "SelectVariable" } },
+            { "caption": "Nicht stoeren", "name": "DndVarID", "width": "200px", "add": 0, "edit": { "type": "SelectVariable" } },
+            { "caption": "Ruhe von", "name": "RuheVon", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Ruhe bis", "name": "RuheBis", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Kanaele",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Ein Kanal ist ein Adapterskript. Es trifft keine Politik und fuehrt keine Aktionsskripte aus. Die Empfaengerbindung darf nur gesetzt werden, wenn der Kanal serverseitig genau eine Person erreicht - nur solche Kanaele bekommen vertrauliche Meldungen."
+        },
+        {
+          "type": "List",
+          "name": "Kanaele",
+          "rowCount": 8,
+          "add": true,
+          "delete": true,
+          "columns": [
+            { "caption": "Schluessel", "name": "Key", "width": "130px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Adressierung", "name": "Adressierung", "width": "120px", "add": "global",
+              "edit": { "type": "Select", "options": [
+                { "caption": "Zone", "value": "zone" },
+                { "caption": "Person", "value": "person" },
+                { "caption": "Global", "value": "global" } ] } },
+            { "caption": "Zone", "name": "ZoneKey", "width": "110px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Empfaenger", "name": "EmpfaengerKey", "width": "110px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Oeffentlich", "name": "Oeffentlich", "width": "100px", "add": true, "edit": { "type": "CheckBox" } },
+            { "caption": "Bindung nachgewiesen", "name": "EmpfaengerBindungNachgewiesen", "width": "170px", "add": false, "edit": { "type": "CheckBox" } },
+            { "caption": "Stoergrad", "name": "Stoergrad", "width": "110px", "add": "keiner",
+              "edit": { "type": "Select", "options": [
+                { "caption": "keiner", "value": "keiner" },
+                { "caption": "niedrig", "value": "niedrig" },
+                { "caption": "mittel", "value": "mittel" },
+                { "caption": "hoch", "value": "hoch" } ] } },
+            { "caption": "Ab Dringlichkeit", "name": "MinDringlichkeit", "width": "130px", "add": "info",
+              "edit": { "type": "Select", "options": [
+                { "caption": "info", "value": "info" },
+                { "caption": "normal", "value": "normal" },
+                { "caption": "wichtig", "value": "wichtig" },
+                { "caption": "alarm", "value": "alarm" } ] } },
+            { "caption": "Modus", "name": "Zustellmodus", "width": "110px", "add": "bevorzugt",
+              "edit": { "type": "Select", "options": [
+                { "caption": "immer", "value": "immer" },
+                { "caption": "bevorzugt", "value": "bevorzugt" },
+                { "caption": "ausweich", "value": "ausweich" },
+                { "caption": "nur bei Alarm", "value": "nur_alarm" } ] } },
+            { "caption": "Prio", "name": "Prioritaet", "width": "60px", "add": 1, "edit": { "type": "NumberSpinner" } },
+            { "caption": "Fallback-Gruppe", "name": "FallbackGruppe", "width": "130px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Ereignisfilter", "name": "Ereignisfilter", "width": "150px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Zustellt extern", "name": "ZustelltExtern", "width": "120px", "add": false, "edit": { "type": "CheckBox" } },
+            { "caption": "Kann", "name": "Kann", "width": "260px", "add": "text", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Ack-Timeout (s)", "name": "AckTimeoutSekunden", "width": "120px", "add": 30, "edit": { "type": "NumberSpinner" } },
+            { "caption": "Max. Versuche", "name": "MaxVersuche", "width": "110px", "add": 3, "edit": { "type": "NumberSpinner" } },
+            { "caption": "Lebensdauer", "name": "Lebensdauer", "width": "120px", "add": "fluechtig",
+              "edit": { "type": "Select", "options": [
+                { "caption": "fluechtig", "value": "fluechtig" },
+                { "caption": "persistent", "value": "persistent" } ] } },
+            { "caption": "Adapterskript", "name": "ScriptID", "width": "220px", "add": 0, "edit": { "type": "SelectScript" } },
+            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+          ]
+        },
+        {
+          "type": "Label",
+          "caption": "Spalte Kann: kommasepariert aus ereignis, text, aktion_anzeigen, callback, aktualisieren, zurueckziehen"
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Quellen",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Fuer lokale Symcon-Skripte ist diese Liste eine Plausibilitaets- und Konfigurationsgrenze, KEINE Sicherheitsgrenze: Jedes lokale Skript laeuft mit denselben Rechten und koennte jede Kennung behaupten. Ihr Nutzen liegt in der Dringlichkeitsbegrenzung, im Flutschutz und in der Nachvollziehbarkeit. Nur externe Quellen (MQTT, WebHook) werden echt geprueft."
+        },
+        {
+          "type": "List",
+          "name": "Quellen",
+          "rowCount": 6,
+          "add": true,
+          "delete": true,
+          "columns": [
+            { "caption": "Quellkennung", "name": "Quellkennung", "width": "200px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Art", "name": "Art", "width": "100px", "add": "lokal",
+              "edit": { "type": "Select", "options": [
+                { "caption": "lokal", "value": "lokal" },
+                { "caption": "extern", "value": "extern" } ] } },
+            { "caption": "Erlaubte Ereignisse", "name": "ErlaubteEreignisse", "width": "220px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Max. Dringlichkeit", "name": "MaxDringlichkeit", "width": "140px", "add": "wichtig",
+              "edit": { "type": "Select", "options": [
+                { "caption": "info", "value": "info" },
+                { "caption": "normal", "value": "normal" },
+                { "caption": "wichtig", "value": "wichtig" },
+                { "caption": "alarm", "value": "alarm" } ] } },
+            { "caption": "Gefahrenberechtigt", "name": "Gefahrenberechtigt", "width": "150px", "add": false, "edit": { "type": "CheckBox" } },
+            { "caption": "Rate-Schluessel (fest)", "name": "RateKeyRegel", "width": "160px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Mindestintervall (s)", "name": "MinIntervallSekunden", "width": "140px", "add": 0, "edit": { "type": "NumberSpinner" } },
+            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Aktionen (Allowlist)",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Die einzige Stelle, an der ein ausfuehrbares Skript steht. Meldungen tragen nur Aktionskennungen, niemals eine Skript-ID. Aktionen derselben Exklusivgruppe schliessen einander aus; leer bedeutet eine eigene Gruppe je Aktion. Retry bei sicherem Fehler nur fuer nachweislich idempotente Aktionen - niemals fuer eine Tueroeffnung."
+        },
+        {
+          "type": "List",
+          "name": "Aktionen",
+          "rowCount": 5,
+          "add": true,
+          "delete": true,
+          "columns": [
+            { "caption": "Aktionskennung", "name": "Aktionskennung", "width": "170px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Skript", "name": "ScriptID", "width": "220px", "add": 0, "edit": { "type": "SelectScript" } },
+            { "caption": "Erlaubte Quellen", "name": "ErlaubteQuellen", "width": "200px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Erlaubte Empfaenger", "name": "ErlaubteEmpfaenger", "width": "180px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Erlaubte Kanaele", "name": "ErlaubteKanaele", "width": "180px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Exklusivgruppe", "name": "Exklusivgruppe", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Max. Gueltigkeit (s)", "name": "MaxGueltigSekunden", "width": "150px", "add": 0, "edit": { "type": "NumberSpinner" } },
+            { "caption": "Retry bei sicherem Fehler", "name": "RetryBeiSicheremFehler", "width": "190px", "add": false, "edit": { "type": "CheckBox" } },
+            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Politik",
+      "items": [
+        {
+          "type": "CheckBox",
+          "name": "PolitikAktiv",
+          "caption": "Weiche Politikfilter aktiv (Praesenz, Anwesenheit, nicht stoeren, Ruhezeit, Mindestdringlichkeit)"
+        },
+        {
+          "type": "Label",
+          "caption": "Abschalten setzt das Modul auf Phase-1-Verhalten zurueck. Die harten Schutzfilter - Adressierung, Darstellbarkeit, Vertraulichkeit, Aktionserlaubnis - bleiben dabei IMMER aktiv."
+        },
+        { "type": "ValidationTextBox", "name": "RuheVon", "caption": "Globale Ruhezeit von (HH:MM)", "width": "120px" },
+        { "type": "ValidationTextBox", "name": "RuheBis", "caption": "Globale Ruhezeit bis (HH:MM)", "width": "120px" },
+        { "type": "SelectVariable", "name": "GlobalDndVarID", "caption": "Globales Nicht stoeren", "width": "400px" },
+        { "type": "ValidationTextBox", "name": "AlarmFallbackKanaele", "caption": "Alarm-Fallback: Kanal-Schluessel, kommasepariert", "width": "400px" },
+        {
+          "type": "Label",
+          "caption": "Der Alarm-Fallback greift nur, wenn Speichern oder Routing scheitert UND die Quelle gefahrenberechtigt ist. Er entfernt Aktionen und Tokens und wahrt die Vertraulichkeit. Er schuetzt NICHT gegen einen Ausfall des Moduls selbst - dafuer stehen autarke Hardware-Sirenen."
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Speicher",
+      "items": [
+        { "type": "NumberSpinner", "name": "RetentionTage", "caption": "Journal aufbewahren (Tage)", "minimum": 1 },
+        { "type": "NumberSpinner", "name": "SegmentMaxMB", "caption": "Journalsegment max. (MB)", "minimum": 1 },
+        { "type": "NumberSpinner", "name": "MaxOffeneMeldungen", "caption": "Max. gleichzeitig offene Meldungen", "minimum": 10 },
+        { "type": "NumberSpinner", "name": "LoeschKarenzSekunden", "caption": "Abgelaufene Meldung loeschen nach (Sekunden)", "minimum": 0 }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Button",
+      "caption": "Testmeldung senden",
+      "onClick": "echo MZ_Melden($id, json_encode([\"quelle\" => \"test\", \"titel\" => \"Test\", \"text\" => \"Testmeldung der Meldungszentrale\", \"dringlichkeit\" => \"info\"]));"
+    },
+    {
+      "type": "Button",
+      "caption": "Journal (letzte Eintraege)",
+      "onClick": "$j = json_decode(MZ_Journal($id), true); foreach (array_slice($j, -25) as $e) { echo date(\"d.m. H:i:s\", $e[\"zeit\"]) . \"  \" . json_encode($e) . \"\\n\"; }"
+    },
+    {
+      "type": "Button",
+      "caption": "Offene Meldungen",
+      "onClick": "echo MZ_Aktuell($id);"
+    }
+  ],
+  "status": [
+    { "code": 102, "icon": "active", "caption": "Aktiv" },
+    { "code": 201, "icon": "error", "caption": "Konfigurationsfehler - siehe Debug-Fenster" }
+  ]
+}

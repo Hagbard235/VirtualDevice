@@ -1,0 +1,16 @@
+{
+    "id": "{6608B059-850F-4563-9F50-7D003FC31BDC}",
+    "name": "Meldungszentrale",
+    "type": 3,
+    "vendor": "Custom",
+    "aliases":
+    [
+        "Meldung",
+        "Meldungszentrale",
+        "Benachrichtigungen"
+    ],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "MZ"
+}
