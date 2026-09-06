@@ -86,6 +86,11 @@ class Meldungszentrale extends IPSModule {
         // Timer je Aktion - das erzeugte nur Objekt- und Zustandschurn.
         $this->RegisterTimer("Faellig", 0, 'MZ_Faellig($_IPS[\'TARGET\']);');
         $this->RegisterTimer("Aufraeumen", 0, 'MZ_Aufraeumen($_IPS[\'TARGET\']);');
+
+        // Eigene Darstellung ueber das HTML-SDK. Ohne diesen Aufruf
+        // wird GetVisualizationTile nie abgefragt.
+        // 1 = Visualisierung via HTML-SDK.
+        $this->SetVisualizationType(1);
     }
 
     public function ApplyChanges() {
