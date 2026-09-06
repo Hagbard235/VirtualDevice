@@ -1296,6 +1296,86 @@ class Meldungszentrale extends IPSModule {
     }
 
     // ==================================================================
+    // Konfigurationsformular
+    // ==================================================================
+
+    /**
+     * Ergaenzt das statische Formular um einen Diagnoseblock. Der Betrieb
+     * eines solchen Moduls scheitert selten am Code, sondern daran, dass
+     * niemand sieht, was es gerade tut - deshalb steht der Zustand direkt
+     * in der Konfiguration und muss nicht ueber Schaltflaechen erfragt
+     * werden.
+     */
+    public function GetConfigurationForm() {
+        $form = json_decode(@file_get_contents(__DIR__ . "/form.json"), true);
+        if (!is_array($form)) return "{}";
+
+        $offen = 0; $mitAktion = 0; $vertraulich = 0; $aeltester = 0;
+        foreach ($this->OffeneMeldungen() as $m) {
+            if (time() > $m["gueltigBis"]) continue;
+            $offen++;
+            if (count($m["aktionen"]) > 0) $mitAktion++;
+            if ($m["vertraulich"]) $vertraulich++;
+            if ($aeltester === 0 || $m["erstellt"] < $aeltester) $aeltester = $m["erstellt"];
+        }
+
+        $segmente = $this->JournalSegmente();
+        $bytes = 0;
+        foreach ($segmente as $f) $bytes += @filesize($f);
+
+        // Nur die juengsten Eintraege lesen - das Journal kann gross sein.
+        $letzteFehler = [];
+        $letztes = count($segmente) > 0 ? end($segmente) : "";
+        if ($letztes !== "" && is_file($letztes)) {
+            $zeilen = @file($letztes, FILE_IGNORE_NEW_LINES);
+            if (is_array($zeilen)) {
+                foreach (array_reverse(array_slice($zeilen, -400)) as $z) {
+                    $d = json_decode($z, true);
+                    if (!is_array($d)) continue;
+                    $typ = $d["typ"] ?? "";
+                    if (in_array($typ, ["abgewiesen", "annahmefehler", "verlustverdacht",
+                                        "quarantaene", "kein_kanal", "aktion_abgewiesen"])) {
+                        $letzteFehler[] = date("d.m. H:i", (int)$d["zeit"]) . "  " . $typ
+                                        . "  " . ($d["fehlercode"] ?? ($d["grund"] ?? ""));
+                    }
+                    if (count($letzteFehler) >= 5) break;
+                }
+            }
+        }
+
+        $status = sprintf("Offene Meldungen: %d  (davon %d mit Aktion, %d vertraulich)", $offen, $mitAktion, $vertraulich);
+        if ($aeltester > 0) $status .= "  ·  aelteste seit " . date("d.m. H:i", $aeltester);
+        $speicher = sprintf("Journal: %d Segment(e), %s  ·  Aufbewahrung %d Tage  ·  Grenze %d offene Meldungen",
+                            count($segmente), $this->Groesse($bytes),
+                            $this->ReadPropertyInteger("RetentionTage"),
+                            $this->ReadPropertyInteger("MaxOffeneMeldungen"));
+        $politik = $this->ReadPropertyBoolean("PolitikAktiv")
+            ? "Politik aktiv - Praesenz, Anwesenheit, nicht stoeren, Ruhezeit und Mindestdringlichkeit werden geprueft."
+            : "Politik ABGESCHALTET - nur die harten Schutzfilter greifen (Adressierung, Darstellbarkeit, Vertraulichkeit, Aktionserlaubnis).";
+
+        $block = [
+            ["type" => "ExpansionPanel", "caption" => "Zustand", "expanded" => true, "items" => [
+                ["type" => "Label", "caption" => $status],
+                ["type" => "Label", "caption" => $speicher],
+                ["type" => "Label", "caption" => $politik],
+                ["type" => "Label", "caption" => count($letzteFehler) > 0
+                    ? "Letzte auffaellige Journaleintraege:
+" . implode("
+", $letzteFehler)
+                    : "Keine auffaelligen Journaleintraege in den letzten Zeilen."]
+            ]]
+        ];
+        array_splice($form["elements"], 1, 0, $block);
+        return json_encode($form, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function Groesse(int $bytes): string {
+        if ($bytes < 1024) return $bytes . " B";
+        if ($bytes < 1048576) return round($bytes / 1024, 1) . " KB";
+        return round($bytes / 1048576, 1) . " MB";
+    }
+
+    // ==================================================================
     // Anzeige (HTML-SDK)
     // ==================================================================
 
