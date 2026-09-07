@@ -707,6 +707,12 @@ class Meldungszentrale extends IPSModule {
                 if (time() > $m["gueltigBis"]) {
                     $m["aktionen"][$idx]["zustand"] = self::AKTION_ABGELAUFEN;
                     $this->MeldungSchreiben($m);
+                    // Auch die Ablehnung gehoert ins Journal: Sonst laesst sich
+                    // spaeter nicht unterscheiden, ob niemand geklickt hat oder
+                    // ob der Klick zu spaet kam.
+                    $this->JournalAnhaengen(["typ" => "aktion_abgewiesen", "meldungID" => $MeldungID,
+                                             "aktion" => $Aktionskennung, "kanal" => $kanal,
+                                             "grund" => "abgelaufen"]);
                     return false;
                 }
                 $m["aktionen"][$idx]["zustand"] = self::AKTION_LAEUFT;
@@ -946,9 +952,17 @@ class Meldungszentrale extends IPSModule {
         $p = $this->MeldungPfad($meldungID);
         if (!is_file($p)) return null;
         $d = json_decode(@file_get_contents($p), true);
-        if (!is_array($d)) {
+        // Nicht nur "ist es JSON", sondern "ist es eine Meldung". Eine
+        // strukturell unvollstaendige Datei fuehrte sonst weiter unten zu
+        // PHP-Warnungen statt in die Quarantaene.
+        $vollstaendig = is_array($d)
+            && isset($d["meldungID"], $d["gueltigBis"], $d["dringlichkeit"])
+            && isset($d["aktionen"]) && is_array($d["aktionen"])
+            && isset($d["auftraege"]) && is_array($d["auftraege"]);
+        if (!$vollstaendig) {
             @rename($p, $this->QuarantaeneDir() . basename($p));
-            $this->JournalAnhaengen(["typ" => "quarantaene", "meldungID" => $meldungID]);
+            $this->JournalAnhaengen(["typ" => "quarantaene", "meldungID" => $meldungID,
+                                     "grund" => is_array($d) ? "struktur" : "unlesbar"]);
             return null;
         }
         return $d;
