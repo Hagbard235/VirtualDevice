@@ -10,7 +10,7 @@
       "items": [
         {
           "type": "Label",
-          "caption": "Ein Raum mit Lautsprechern oder Anzeigen. Das Praesenzsignal wird immer geprueft, nicht nur nachts. Es taugt alles, was im Ein-Zustand wahr oder groesser null ist."
+          "caption": "Ein Raum mit Lautsprechern oder Anzeigen. Das Praesenzsignal wird immer geprueft, nicht nur nachts. Es taugt alles, was im Ein-Zustand wahr oder groesser null ist. \"Praesenz hebt Ruhezeit auf\": Wer nachweislich wach im Raum ist, wird von einer Ansage nicht gestoert - er wartet vielleicht gerade darauf. Fuer Schlafraeume ausgeschaltet lassen."
         },
         {
           "type": "List",
@@ -22,6 +22,7 @@
             { "caption": "Schluessel", "name": "Key", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
             { "caption": "Praesenzsignal", "name": "PraesenzVarID", "width": "220px", "add": 0, "edit": { "type": "SelectVariable" } },
             { "caption": "Praesenz Pflicht", "name": "PraesenzPflicht", "width": "130px", "add": true, "edit": { "type": "CheckBox" } },
+            { "caption": "Praesenz hebt Ruhezeit auf", "name": "PraesenzHebtRuheAuf", "width": "190px", "add": false, "edit": { "type": "CheckBox" } },
             { "caption": "Nicht stoeren", "name": "DndVarID", "width": "200px", "add": 0, "edit": { "type": "SelectVariable" } },
             { "caption": "Ruhe von", "name": "RuheVon", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
             { "caption": "Ruhe bis", "name": "RuheBis", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },

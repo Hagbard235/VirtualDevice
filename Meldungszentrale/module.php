@@ -507,14 +507,18 @@ class Meldungszentrale extends IPSModule {
 
         $dnd = false;
         $ruheVon = ""; $ruheBis = "";
+        // Wird gesetzt, wenn die Zone nachweislich belegt ist UND sie so
+        // konfiguriert ist, dass Praesenz die Ruhezeit aufhebt.
+        $wachUndErlaubt = false;
         if ($k["Adressierung"] === "zone") {
             $z = $this->ZoneFinden($k["ZoneKey"]);
             if ($z !== null) {
+                $p = $this->SignalLesen((int)$z["PraesenzVarID"], $failOpen);
                 if ($z["PraesenzPflicht"]) {
-                    $p = $this->SignalLesen((int)$z["PraesenzVarID"], $failOpen);
                     if ($p === null) { /* fail-open: Filter uebersprungen */ }
                     elseif (!$p) return "keine_praesenz";
                 }
+                if ($p === true && $z["PraesenzHebtRuheAuf"]) $wachUndErlaubt = true;
                 $d = $this->SignalLesen((int)$z["DndVarID"], $failOpen);
                 if ($d === true) $dnd = true;
                 $ruheVon = $z["RuheVon"]; $ruheBis = $z["RuheBis"];
@@ -542,7 +546,7 @@ class Meldungszentrale extends IPSModule {
             $ruheVon = $this->ReadPropertyString("RuheVon");
             $ruheBis = $this->ReadPropertyString("RuheBis");
         }
-        if ($this->IstRuhezeit($ruheVon, $ruheBis)) {
+        if ($this->IstRuhezeit($ruheVon, $ruheBis) && !$wachUndErlaubt) {
             $erlaubt = self::RUHE_DURCHGRIFF[$m["dringlichkeit"]];
             $stoer = self::STOERGRAD[strtolower(trim($k["Stoergrad"]))] ?? 0;
             if ($stoer > $erlaubt) return "ruhezeit";
@@ -1605,6 +1609,7 @@ class Meldungszentrale extends IPSModule {
             if ((string)($z["Key"] ?? "") !== $key) continue;
             return ["Key" => $key, "PraesenzVarID" => (int)($z["PraesenzVarID"] ?? 0),
                     "PraesenzPflicht" => (bool)($z["PraesenzPflicht"] ?? true),
+                    "PraesenzHebtRuheAuf" => (bool)($z["PraesenzHebtRuheAuf"] ?? false),
                     "DndVarID" => (int)($z["DndVarID"] ?? 0),
                     "RuheVon" => (string)($z["RuheVon"] ?? ""), "RuheBis" => (string)($z["RuheBis"] ?? ""),
                     "Aktiv" => (bool)($z["Aktiv"] ?? true)];
