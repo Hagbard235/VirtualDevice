@@ -139,7 +139,7 @@
             { "caption": "Art", "name": "Art", "width": "100px", "add": "lokal",
               "edit": { "type": "Select", "options": [
                 { "caption": "lokal", "value": "lokal" },
-                { "caption": "extern", "value": "extern" } ] } },
+                { "caption": "extern (noch nicht nutzbar)", "value": "extern" } ] } },
             { "caption": "Erlaubte Ereignisse", "name": "ErlaubteEreignisse", "width": "220px", "add": "", "edit": { "type": "ValidationTextBox" } },
             { "caption": "Max. Dringlichkeit", "name": "MaxDringlichkeit", "width": "140px", "add": "wichtig",
               "edit": { "type": "Select", "options": [

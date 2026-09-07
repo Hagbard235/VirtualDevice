@@ -177,6 +177,16 @@ class Meldungszentrale extends IPSModule {
             return ["ok" => false, "fehlercode" => "quelle_unbekannt"];
         }
 
+        // Konzept 5.2 verlangt fuer externe Quellen HMAC, Zeitfenster, Nonce
+        // und Groessenlimits. Nichts davon ist gebaut - die Pruefung kommt
+        // mit dem Watchdog. Solange sie fehlt, wird eine als extern
+        // konfigurierte Quelle abgewiesen statt ungeprueft durchgelassen:
+        // Sonst verspraeche das Formular einen Schutz, den es nicht gibt.
+        if ($q["Art"] === "extern") {
+            $this->Annahmefehler("extern_ungeprueft", $Options, $quelle);
+            return ["ok" => false, "fehlercode" => "extern_ungeprueft"];
+        }
+
         $warnungen = [];
         $dring = strtolower(trim((string)($opt["dringlichkeit"] ?? "normal")));
         if (!isset(self::DRINGLICHKEIT[$dring])) $dring = "normal";
