@@ -10,7 +10,18 @@
 -->
 <style>
   .mz-liste { font-family: -apple-system, "Segoe UI", sans-serif; font-size: 14px; }
-  .mz-leer  { opacity: .6; padding: 12px 0; }
+
+  /* Der Leerzustand ist der haeufigste Zustand. Er bekommt deshalb Luft und
+     eine Aussage, statt nur die Abwesenheit von Meldungen zu vermelden. */
+  .mz-leer { display: flex; flex-direction: column; align-items: center; justify-content: center;
+             gap: 6px; padding: 28px 0 24px 0; text-align: center; }
+  .mz-leer svg { opacity: .28; }
+  .mz-leer-haupt { opacity: .75; }
+
+  /* Fusszeile: verrät, dass die Zentrale arbeitet, auch wenn nichts ansteht. */
+  .mz-fuss { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(128,128,128,.2);
+             font-size: 12px; opacity: .5; display: flex; gap: 6px; flex-wrap: wrap; }
+  .mz-warn { color: #d9822b; opacity: .9; }
   .mz-eintrag { padding: 8px 0; border-bottom: 1px solid rgba(128,128,128,.25); }
   .mz-kopf { display: flex; align-items: baseline; gap: 8px; }
   .mz-titel { font-weight: 600; }
@@ -56,7 +67,14 @@
     });
 
     if (meldungen.length === 0) {
-      ziel.innerHTML = '<div class="mz-leer">Keine offenen Meldungen.</div>';
+      ziel.innerHTML =
+        '<div class="mz-leer">'
+        + '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        + ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>'
+        + '<path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>'
+        + '<div class="mz-leer-haupt">Nichts Offenes</div>'
+        + '</div>' + fusszeile();
       return;
     }
 
@@ -85,7 +103,20 @@
       }
       html += "</div>";
     });
-    ziel.innerHTML = html;
+    ziel.innerHTML = html + fusszeile();
+  }
+
+  // Zeigt, dass die Zentrale arbeitet - und warnt, wenn ihre Politik
+  // abgeschaltet ist, denn dann stellt sie alles ungefiltert zu.
+  function fusszeile() {
+    var st = mzDaten.status || {};
+    var teile = [];
+    if (st.kanaele) teile.push(st.kanaele + (st.kanaele === 1 ? " Kanal" : " Kanäle") + " bereit");
+    if (st.ruhezeit) teile.push("Ruhezeit" + (st.ruheBis ? " bis " + st.ruheBis : ""));
+    if (teile.length === 0) return "";
+    var h = '<div class="mz-fuss"><span>' + teile.join(" · ") + "</span>";
+    if (st.politikAus) h += '<span class="mz-warn">Filter abgeschaltet</span>';
+    return h + "</div>";
   }
 
   function hinweis(aktionen) {

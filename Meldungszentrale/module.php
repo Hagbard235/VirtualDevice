@@ -1571,7 +1571,23 @@ class Meldungszentrale extends IPSModule {
                         "dringlichkeit" => $m["dringlichkeit"], "erstellt" => $m["erstellt"],
                         "gueltigBis" => $m["gueltigBis"], "aktionen" => $aktionen];
         }
-        return json_encode(["meldungen" => $liste], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        // Betriebszustand fuer die Fusszeile. Eine leere Kachel soll die
+        // Frage beantworten, die man beim Hinschauen hat: Laeuft das noch?
+        $kanaele = 0;
+        foreach ($this->KanalListe() as $k) if ($k["Aktiv"]) $kanaele++;
+        $ruheVon = $this->ReadPropertyString("RuheVon");
+        $ruheBis = $this->ReadPropertyString("RuheBis");
+
+        return json_encode([
+            "meldungen" => $liste,
+            "status" => [
+                "kanaele"   => $kanaele,
+                "ruhezeit"  => $this->IstRuhezeit($ruheVon, $ruheBis),
+                "ruheBis"   => $ruheBis,
+                "politikAus" => !$this->ReadPropertyBoolean("PolitikAktiv")
+            ]
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private function AnzeigeAktualisieren() {
