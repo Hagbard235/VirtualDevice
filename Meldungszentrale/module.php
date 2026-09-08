@@ -517,8 +517,9 @@ class Meldungszentrale extends IPSModule {
 
         $dnd = false;
         $ruheVon = ""; $ruheBis = "";
-        // Wird gesetzt, wenn die Zone nachweislich belegt ist UND sie so
-        // konfiguriert ist, dass Praesenz die Ruhezeit aufhebt.
+        // Wird gesetzt, wenn in der Zone nachweislich jemand wach ist. Dann
+        // entfaellt die Ruhezeit fuer diese Zone - wer wach ist, wartet
+        // vielleicht gerade auf die Meldung.
         $wachUndErlaubt = false;
         if ($k["Adressierung"] === "zone") {
             $z = $this->ZoneFinden($k["ZoneKey"]);
@@ -528,7 +529,7 @@ class Meldungszentrale extends IPSModule {
                     if ($p === null) { /* fail-open: Filter uebersprungen */ }
                     elseif (!$p) return "keine_praesenz";
                 }
-                if ($p === true && $z["PraesenzHebtRuheAuf"]) $wachUndErlaubt = true;
+                if ($this->WachSignal($z)) $wachUndErlaubt = true;
                 $d = $this->SignalLesen((int)$z["DndVarID"], $failOpen);
                 if ($d === true) $dnd = true;
                 $ruheVon = $z["RuheVon"]; $ruheBis = $z["RuheBis"];
@@ -1633,7 +1634,7 @@ class Meldungszentrale extends IPSModule {
             if ((string)($z["Key"] ?? "") !== $key) continue;
             return ["Key" => $key, "PraesenzVarID" => (int)($z["PraesenzVarID"] ?? 0),
                     "PraesenzPflicht" => (bool)($z["PraesenzPflicht"] ?? true),
-                    "PraesenzHebtRuheAuf" => (bool)($z["PraesenzHebtRuheAuf"] ?? false),
+                    "WachSignalIDs" => (string)($z["WachSignalIDs"] ?? ""),
                     "DndVarID" => (int)($z["DndVarID"] ?? 0),
                     "RuheVon" => (string)($z["RuheVon"] ?? ""), "RuheBis" => (string)($z["RuheBis"] ?? ""),
                     "Aktiv" => (bool)($z["Aktiv"] ?? true)];
@@ -1789,7 +1790,35 @@ class Meldungszentrale extends IPSModule {
         $w = GetValue($varID);
         if (is_bool($w)) return $w;
         if (is_int($w) || is_float($w)) return $w > 0;
+        // Manche Geraete melden ihren Zustand als Text - der Sternenhimmel im
+        // Schlafzimmer etwa kommt ueber MQTT als "on"/"off". Ohne diese
+        // Auswertung galte er als unlesbar.
+        if (is_string($w)) {
+            $t = strtolower(trim($w));
+            if (in_array($t, ["on", "an", "ein", "true", "1", "yes", "ja"], true))  return true;
+            if (in_array($t, ["off", "aus", "false", "0", "no", "nein", ""], true)) return false;
+        }
         return null;
+    }
+
+    /**
+     * Ist in dieser Zone jemand wach?
+     *
+     * Bewusst getrennt von der Praesenz: Im Wohnzimmer heisst Bewegung
+     * "jemand ist wach", im Schlafzimmer heisst Anwesenheit nachts das
+     * Gegenteil - dort schlaeft dann jemand. Als Wachsignal taugt deshalb je
+     * nach Raum etwas anderes; im Schlafzimmer sind es die Lampen.
+     *
+     * Mehrere Signale sind oder-verknuepft: Eine brennende Lampe genuegt.
+     * Ohne fail-open, denn die sichere Richtung ist Schweigen - ein
+     * unlesbares Signal darf nachts keine Ansage ausloesen.
+     */
+    private function WachSignal(array $zone): bool {
+        foreach ($this->Liste((string)$zone["WachSignalIDs"]) as $roh) {
+            $id = (int)trim($roh);
+            if ($id > 0 && $this->SignalLesen($id, false) === true) return true;
+        }
+        return false;
     }
 
     private function IstRuhezeit(string $von, string $bis): bool {

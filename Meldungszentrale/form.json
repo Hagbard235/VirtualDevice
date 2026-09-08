@@ -10,7 +10,7 @@
       "items": [
         {
           "type": "Label",
-          "caption": "Ein Raum mit Lautsprechern oder Anzeigen. Das Praesenzsignal wird immer geprueft, nicht nur nachts. Es taugt alles, was im Ein-Zustand wahr oder groesser null ist. \"Praesenz hebt Ruhezeit auf\": Wer nachweislich wach im Raum ist, wird von einer Ansage nicht gestoert - er wartet vielleicht gerade darauf. Fuer Schlafraeume ausgeschaltet lassen."
+          "caption": "Ein Raum mit Lautsprechern oder Anzeigen. Das Praesenzsignal wird immer geprueft, nicht nur nachts. Es taugt alles, was im Ein-Zustand wahr oder groesser null ist, seit 08.09. auch Text wie \"on\"/\"off\". \"Wachsignale\": Variablen, die belegen, dass hier jemand WACH ist - dann entfaellt die Ruhezeit fuer diesen Raum. Mehrere IDs sind oder-verknuepft, eine genuegt. Im Wohnzimmer taugt dafuer der Bewegungsmelder selbst; im Schlafzimmer nicht, denn dort heisst Anwesenheit nachts eher, dass jemand schlaeft - nimm dort die Lampen. Leer lassen heisst: Die Ruhezeit gilt immer."
         },
         {
           "type": "List",
@@ -19,14 +19,78 @@
           "add": true,
           "delete": true,
           "columns": [
-            { "caption": "Schluessel", "name": "Key", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Praesenzsignal", "name": "PraesenzVarID", "width": "220px", "add": 0, "edit": { "type": "SelectVariable" } },
-            { "caption": "Praesenz Pflicht", "name": "PraesenzPflicht", "width": "130px", "add": true, "edit": { "type": "CheckBox" } },
-            { "caption": "Praesenz hebt Ruhezeit auf", "name": "PraesenzHebtRuheAuf", "width": "190px", "add": false, "edit": { "type": "CheckBox" } },
-            { "caption": "Nicht stoeren", "name": "DndVarID", "width": "200px", "add": 0, "edit": { "type": "SelectVariable" } },
-            { "caption": "Ruhe von", "name": "RuheVon", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Ruhe bis", "name": "RuheBis", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+            {
+              "caption": "Schluessel",
+              "name": "Key",
+              "width": "140px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Praesenzsignal",
+              "name": "PraesenzVarID",
+              "width": "220px",
+              "add": 0,
+              "edit": {
+                "type": "SelectVariable"
+              }
+            },
+            {
+              "caption": "Praesenz Pflicht",
+              "name": "PraesenzPflicht",
+              "width": "130px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "caption": "Wachsignale (IDs, kommagetrennt)",
+              "name": "WachSignalIDs",
+              "width": "220px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Nicht stoeren",
+              "name": "DndVarID",
+              "width": "200px",
+              "add": 0,
+              "edit": {
+                "type": "SelectVariable"
+              }
+            },
+            {
+              "caption": "Ruhe von",
+              "name": "RuheVon",
+              "width": "90px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Ruhe bis",
+              "name": "RuheBis",
+              "width": "90px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Aktiv",
+              "name": "Aktiv",
+              "width": "70px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            }
           ]
         }
       ]
@@ -46,12 +110,60 @@
           "add": true,
           "delete": true,
           "columns": [
-            { "caption": "Schluessel", "name": "Key", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Anwesend", "name": "AnwesendVarID", "width": "220px", "add": 0, "edit": { "type": "SelectVariable" } },
-            { "caption": "Nicht stoeren", "name": "DndVarID", "width": "200px", "add": 0, "edit": { "type": "SelectVariable" } },
-            { "caption": "Ruhe von", "name": "RuheVon", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Ruhe bis", "name": "RuheBis", "width": "90px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+            {
+              "caption": "Schluessel",
+              "name": "Key",
+              "width": "140px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Anwesend",
+              "name": "AnwesendVarID",
+              "width": "220px",
+              "add": 0,
+              "edit": {
+                "type": "SelectVariable"
+              }
+            },
+            {
+              "caption": "Nicht stoeren",
+              "name": "DndVarID",
+              "width": "200px",
+              "add": 0,
+              "edit": {
+                "type": "SelectVariable"
+              }
+            },
+            {
+              "caption": "Ruhe von",
+              "name": "RuheVon",
+              "width": "90px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Ruhe bis",
+              "name": "RuheBis",
+              "width": "90px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Aktiv",
+              "name": "Aktiv",
+              "width": "70px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            }
           ]
         }
       ]
@@ -71,47 +183,255 @@
           "add": true,
           "delete": true,
           "columns": [
-            { "caption": "Schluessel", "name": "Key", "width": "130px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Adressierung", "name": "Adressierung", "width": "120px", "add": "global",
-              "edit": { "type": "Select", "options": [
-                { "caption": "Zone", "value": "zone" },
-                { "caption": "Person", "value": "person" },
-                { "caption": "Global", "value": "global" } ] } },
-            { "caption": "Zone", "name": "ZoneKey", "width": "110px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Empfaenger", "name": "EmpfaengerKey", "width": "110px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Oeffentlich", "name": "Oeffentlich", "width": "100px", "add": true, "edit": { "type": "CheckBox" } },
-            { "caption": "Bindung nachgewiesen", "name": "EmpfaengerBindungNachgewiesen", "width": "170px", "add": false, "edit": { "type": "CheckBox" } },
-            { "caption": "Stoergrad", "name": "Stoergrad", "width": "110px", "add": "keiner",
-              "edit": { "type": "Select", "options": [
-                { "caption": "keiner", "value": "keiner" },
-                { "caption": "niedrig", "value": "niedrig" },
-                { "caption": "mittel", "value": "mittel" },
-                { "caption": "hoch", "value": "hoch" } ] } },
-            { "caption": "Ab Dringlichkeit", "name": "MinDringlichkeit", "width": "130px", "add": "info",
-              "edit": { "type": "Select", "options": [
-                { "caption": "info", "value": "info" },
-                { "caption": "normal", "value": "normal" },
-                { "caption": "wichtig", "value": "wichtig" },
-                { "caption": "alarm", "value": "alarm" } ] } },
-            { "caption": "Modus", "name": "Zustellmodus", "width": "110px", "add": "bevorzugt",
-              "edit": { "type": "Select", "options": [
-                { "caption": "immer", "value": "immer" },
-                { "caption": "bevorzugt", "value": "bevorzugt" },
-                { "caption": "ausweich", "value": "ausweich" },
-                { "caption": "nur bei Alarm", "value": "nur_alarm" } ] } },
-            { "caption": "Prio", "name": "Prioritaet", "width": "60px", "add": 1, "edit": { "type": "NumberSpinner" } },
-            { "caption": "Fallback-Gruppe", "name": "FallbackGruppe", "width": "130px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Ereignisfilter", "name": "Ereignisfilter", "width": "150px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Zustellt extern", "name": "ZustelltExtern", "width": "120px", "add": false, "edit": { "type": "CheckBox" } },
-            { "caption": "Kann", "name": "Kann", "width": "260px", "add": "text", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Ack-Timeout (s)", "name": "AckTimeoutSekunden", "width": "120px", "add": 30, "edit": { "type": "NumberSpinner" } },
-            { "caption": "Max. Versuche", "name": "MaxVersuche", "width": "110px", "add": 3, "edit": { "type": "NumberSpinner" } },
-            { "caption": "Lebensdauer", "name": "Lebensdauer", "width": "120px", "add": "fluechtig",
-              "edit": { "type": "Select", "options": [
-                { "caption": "fluechtig", "value": "fluechtig" },
-                { "caption": "persistent", "value": "persistent" } ] } },
-            { "caption": "Adapterskript", "name": "ScriptID", "width": "220px", "add": 0, "edit": { "type": "SelectScript" } },
-            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+            {
+              "caption": "Schluessel",
+              "name": "Key",
+              "width": "130px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Adressierung",
+              "name": "Adressierung",
+              "width": "120px",
+              "add": "global",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "Zone",
+                    "value": "zone"
+                  },
+                  {
+                    "caption": "Person",
+                    "value": "person"
+                  },
+                  {
+                    "caption": "Global",
+                    "value": "global"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Zone",
+              "name": "ZoneKey",
+              "width": "110px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Empfaenger",
+              "name": "EmpfaengerKey",
+              "width": "110px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Oeffentlich",
+              "name": "Oeffentlich",
+              "width": "100px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "caption": "Bindung nachgewiesen",
+              "name": "EmpfaengerBindungNachgewiesen",
+              "width": "170px",
+              "add": false,
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "caption": "Stoergrad",
+              "name": "Stoergrad",
+              "width": "110px",
+              "add": "keiner",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "keiner",
+                    "value": "keiner"
+                  },
+                  {
+                    "caption": "niedrig",
+                    "value": "niedrig"
+                  },
+                  {
+                    "caption": "mittel",
+                    "value": "mittel"
+                  },
+                  {
+                    "caption": "hoch",
+                    "value": "hoch"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Ab Dringlichkeit",
+              "name": "MinDringlichkeit",
+              "width": "130px",
+              "add": "info",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "info",
+                    "value": "info"
+                  },
+                  {
+                    "caption": "normal",
+                    "value": "normal"
+                  },
+                  {
+                    "caption": "wichtig",
+                    "value": "wichtig"
+                  },
+                  {
+                    "caption": "alarm",
+                    "value": "alarm"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Modus",
+              "name": "Zustellmodus",
+              "width": "110px",
+              "add": "bevorzugt",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "immer",
+                    "value": "immer"
+                  },
+                  {
+                    "caption": "bevorzugt",
+                    "value": "bevorzugt"
+                  },
+                  {
+                    "caption": "ausweich",
+                    "value": "ausweich"
+                  },
+                  {
+                    "caption": "nur bei Alarm",
+                    "value": "nur_alarm"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Prio",
+              "name": "Prioritaet",
+              "width": "60px",
+              "add": 1,
+              "edit": {
+                "type": "NumberSpinner"
+              }
+            },
+            {
+              "caption": "Fallback-Gruppe",
+              "name": "FallbackGruppe",
+              "width": "130px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Ereignisfilter",
+              "name": "Ereignisfilter",
+              "width": "150px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Zustellt extern",
+              "name": "ZustelltExtern",
+              "width": "120px",
+              "add": false,
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "caption": "Kann",
+              "name": "Kann",
+              "width": "260px",
+              "add": "text",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Ack-Timeout (s)",
+              "name": "AckTimeoutSekunden",
+              "width": "120px",
+              "add": 30,
+              "edit": {
+                "type": "NumberSpinner"
+              }
+            },
+            {
+              "caption": "Max. Versuche",
+              "name": "MaxVersuche",
+              "width": "110px",
+              "add": 3,
+              "edit": {
+                "type": "NumberSpinner"
+              }
+            },
+            {
+              "caption": "Lebensdauer",
+              "name": "Lebensdauer",
+              "width": "120px",
+              "add": "fluechtig",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "fluechtig",
+                    "value": "fluechtig"
+                  },
+                  {
+                    "caption": "persistent",
+                    "value": "persistent"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Adapterskript",
+              "name": "ScriptID",
+              "width": "220px",
+              "add": 0,
+              "edit": {
+                "type": "SelectScript"
+              }
+            },
+            {
+              "caption": "Aktiv",
+              "name": "Aktiv",
+              "width": "70px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            }
           ]
         },
         {
@@ -135,22 +455,106 @@
           "add": true,
           "delete": true,
           "columns": [
-            { "caption": "Quellkennung", "name": "Quellkennung", "width": "200px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Art", "name": "Art", "width": "100px", "add": "lokal",
-              "edit": { "type": "Select", "options": [
-                { "caption": "lokal", "value": "lokal" },
-                { "caption": "extern (noch nicht nutzbar)", "value": "extern" } ] } },
-            { "caption": "Erlaubte Ereignisse", "name": "ErlaubteEreignisse", "width": "220px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Max. Dringlichkeit", "name": "MaxDringlichkeit", "width": "140px", "add": "wichtig",
-              "edit": { "type": "Select", "options": [
-                { "caption": "info", "value": "info" },
-                { "caption": "normal", "value": "normal" },
-                { "caption": "wichtig", "value": "wichtig" },
-                { "caption": "alarm", "value": "alarm" } ] } },
-            { "caption": "Gefahrenberechtigt", "name": "Gefahrenberechtigt", "width": "150px", "add": false, "edit": { "type": "CheckBox" } },
-            { "caption": "Rate-Schluessel (fest)", "name": "RateKeyRegel", "width": "160px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Mindestintervall (s)", "name": "MinIntervallSekunden", "width": "140px", "add": 0, "edit": { "type": "NumberSpinner" } },
-            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+            {
+              "caption": "Quellkennung",
+              "name": "Quellkennung",
+              "width": "200px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Art",
+              "name": "Art",
+              "width": "100px",
+              "add": "lokal",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "lokal",
+                    "value": "lokal"
+                  },
+                  {
+                    "caption": "extern (noch nicht nutzbar)",
+                    "value": "extern"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Erlaubte Ereignisse",
+              "name": "ErlaubteEreignisse",
+              "width": "220px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Max. Dringlichkeit",
+              "name": "MaxDringlichkeit",
+              "width": "140px",
+              "add": "wichtig",
+              "edit": {
+                "type": "Select",
+                "options": [
+                  {
+                    "caption": "info",
+                    "value": "info"
+                  },
+                  {
+                    "caption": "normal",
+                    "value": "normal"
+                  },
+                  {
+                    "caption": "wichtig",
+                    "value": "wichtig"
+                  },
+                  {
+                    "caption": "alarm",
+                    "value": "alarm"
+                  }
+                ]
+              }
+            },
+            {
+              "caption": "Gefahrenberechtigt",
+              "name": "Gefahrenberechtigt",
+              "width": "150px",
+              "add": false,
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "caption": "Rate-Schluessel (fest)",
+              "name": "RateKeyRegel",
+              "width": "160px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Mindestintervall (s)",
+              "name": "MinIntervallSekunden",
+              "width": "140px",
+              "add": 0,
+              "edit": {
+                "type": "NumberSpinner"
+              }
+            },
+            {
+              "caption": "Aktiv",
+              "name": "Aktiv",
+              "width": "70px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            }
           ]
         }
       ]
@@ -170,15 +574,87 @@
           "add": true,
           "delete": true,
           "columns": [
-            { "caption": "Aktionskennung", "name": "Aktionskennung", "width": "170px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Skript", "name": "ScriptID", "width": "220px", "add": 0, "edit": { "type": "SelectScript" } },
-            { "caption": "Erlaubte Quellen", "name": "ErlaubteQuellen", "width": "200px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Erlaubte Empfaenger", "name": "ErlaubteEmpfaenger", "width": "180px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Erlaubte Kanaele", "name": "ErlaubteKanaele", "width": "180px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Exklusivgruppe", "name": "Exklusivgruppe", "width": "140px", "add": "", "edit": { "type": "ValidationTextBox" } },
-            { "caption": "Max. Gueltigkeit (s)", "name": "MaxGueltigSekunden", "width": "150px", "add": 0, "edit": { "type": "NumberSpinner" } },
-            { "caption": "Retry bei sicherem Fehler", "name": "RetryBeiSicheremFehler", "width": "190px", "add": false, "edit": { "type": "CheckBox" } },
-            { "caption": "Aktiv", "name": "Aktiv", "width": "70px", "add": true, "edit": { "type": "CheckBox" } }
+            {
+              "caption": "Aktionskennung",
+              "name": "Aktionskennung",
+              "width": "170px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Skript",
+              "name": "ScriptID",
+              "width": "220px",
+              "add": 0,
+              "edit": {
+                "type": "SelectScript"
+              }
+            },
+            {
+              "caption": "Erlaubte Quellen",
+              "name": "ErlaubteQuellen",
+              "width": "200px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Erlaubte Empfaenger",
+              "name": "ErlaubteEmpfaenger",
+              "width": "180px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Erlaubte Kanaele",
+              "name": "ErlaubteKanaele",
+              "width": "180px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Exklusivgruppe",
+              "name": "Exklusivgruppe",
+              "width": "140px",
+              "add": "",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            },
+            {
+              "caption": "Max. Gueltigkeit (s)",
+              "name": "MaxGueltigSekunden",
+              "width": "150px",
+              "add": 0,
+              "edit": {
+                "type": "NumberSpinner"
+              }
+            },
+            {
+              "caption": "Retry bei sicherem Fehler",
+              "name": "RetryBeiSicheremFehler",
+              "width": "190px",
+              "add": false,
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "caption": "Aktiv",
+              "name": "Aktiv",
+              "width": "70px",
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
+            }
           ]
         }
       ]
@@ -196,10 +672,30 @@
           "type": "Label",
           "caption": "Abschalten setzt das Modul auf Phase-1-Verhalten zurueck. Die harten Schutzfilter - Adressierung, Darstellbarkeit, Vertraulichkeit, Aktionserlaubnis - bleiben dabei IMMER aktiv."
         },
-        { "type": "ValidationTextBox", "name": "RuheVon", "caption": "Globale Ruhezeit von (HH:MM)", "width": "120px" },
-        { "type": "ValidationTextBox", "name": "RuheBis", "caption": "Globale Ruhezeit bis (HH:MM)", "width": "120px" },
-        { "type": "SelectVariable", "name": "GlobalDndVarID", "caption": "Globales Nicht stoeren", "width": "400px" },
-        { "type": "ValidationTextBox", "name": "AlarmFallbackKanaele", "caption": "Alarm-Fallback: Kanal-Schluessel, kommasepariert", "width": "400px" },
+        {
+          "type": "ValidationTextBox",
+          "name": "RuheVon",
+          "caption": "Globale Ruhezeit von (HH:MM)",
+          "width": "120px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "RuheBis",
+          "caption": "Globale Ruhezeit bis (HH:MM)",
+          "width": "120px"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "GlobalDndVarID",
+          "caption": "Globales Nicht stoeren",
+          "width": "400px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "AlarmFallbackKanaele",
+          "caption": "Alarm-Fallback: Kanal-Schluessel, kommasepariert",
+          "width": "400px"
+        },
         {
           "type": "Label",
           "caption": "Der Alarm-Fallback greift nur, wenn Speichern oder Routing scheitert UND die Quelle gefahrenberechtigt ist. Er entfernt Aktionen und Tokens und wahrt die Vertraulichkeit. Er schuetzt NICHT gegen einen Ausfall des Moduls selbst - dafuer stehen autarke Hardware-Sirenen."
@@ -210,10 +706,30 @@
       "type": "ExpansionPanel",
       "caption": "Speicher",
       "items": [
-        { "type": "NumberSpinner", "name": "RetentionTage", "caption": "Journal aufbewahren (Tage)", "minimum": 1 },
-        { "type": "NumberSpinner", "name": "SegmentMaxMB", "caption": "Journalsegment max. (MB)", "minimum": 1 },
-        { "type": "NumberSpinner", "name": "MaxOffeneMeldungen", "caption": "Max. gleichzeitig offene Meldungen", "minimum": 10 },
-        { "type": "NumberSpinner", "name": "LoeschKarenzSekunden", "caption": "Abgelaufene Meldung loeschen nach (Sekunden)", "minimum": 0 }
+        {
+          "type": "NumberSpinner",
+          "name": "RetentionTage",
+          "caption": "Journal aufbewahren (Tage)",
+          "minimum": 1
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "SegmentMaxMB",
+          "caption": "Journalsegment max. (MB)",
+          "minimum": 1
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "MaxOffeneMeldungen",
+          "caption": "Max. gleichzeitig offene Meldungen",
+          "minimum": 10
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "LoeschKarenzSekunden",
+          "caption": "Abgelaufene Meldung loeschen nach (Sekunden)",
+          "minimum": 0
+        }
       ]
     }
   ],
@@ -235,7 +751,15 @@
     }
   ],
   "status": [
-    { "code": 102, "icon": "active", "caption": "Aktiv" },
-    { "code": 201, "icon": "error", "caption": "Konfigurationsfehler - siehe Debug-Fenster" }
+    {
+      "code": 102,
+      "icon": "active",
+      "caption": "Aktiv"
+    },
+    {
+      "code": 201,
+      "icon": "error",
+      "caption": "Konfigurationsfehler - siehe Debug-Fenster"
+    }
   ]
 }
