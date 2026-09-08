@@ -878,11 +878,23 @@ class Meldungszentrale extends IPSModule {
     private function NachLaufAktualisieren() {
         $naechster = 0;
         $anzahl = 0;
-        // Ausschliesslich ueber den Index - kein Dateizugriff.
-        foreach ($this->IndexHolen() as $e) {
+        // Der Index traegt die Metadaten, damit hier keine Datei gelesen
+        // werden muss. Nur ihre Existenz wird geprueft: Verschwindet eine
+        // Datei am Modul vorbei, behauptete der Zaehler sonst dauerhaft eine
+        // Meldung, die die Anzeige zu Recht nicht mehr findet - genau der
+        // Widerspruch aus Andres Screenshot vom 08.09.
+        $index = $this->IndexHolen();
+        $verwaist = [];
+        foreach ($index as $id => $e) {
+            if (!is_file($this->MeldungPfad((string)$id))) { $verwaist[] = $id; continue; }
             $anzahl++;
             $kandidat = (int)$e["gueltigBis"];
             if ($naechster === 0 || $kandidat < $naechster) $naechster = $kandidat;
+        }
+        if (count($verwaist) > 0) {
+            foreach ($verwaist as $id) unset($index[$id]);
+            $this->SetBuffer("Index", json_encode($index));
+            $this->JournalAnhaengen(["typ" => "index_bereinigt", "anzahl" => count($verwaist)]);
         }
         $this->SetValue("OffeneMeldungen", $anzahl);
         $this->AnzeigeRendern();
@@ -1569,21 +1581,60 @@ class Meldungszentrale extends IPSModule {
     private function AnzeigeRendern() {
         $zeilen = $this->SichtbareMeldungen(50);
 
-        $h = "<style>.mz{font-family:sans-serif}.mz div{padding:4px 0;border-bottom:1px solid #ddd}"
-           . ".mz .a{color:#c00;font-weight:bold}</style><div class=\"mz\">";
-        if (count($zeilen) === 0) $h .= "<div>Keine offenen Meldungen.</div>";
+        // Die Farben stehen inline, nicht in einem <style>-Block: Eine
+        // HTML-Box teilt sich das Dokument mit der Visualisierung, und ein
+        // Klassenname wie ".mz div" wirkt dort weiter, als er soll.
+        //
+        // Ausserdem wird keine Text- oder Hintergrundfarbe gesetzt, nur ein
+        // halbtransparenter Grauschleier und farbige Balken. So bleibt die
+        // Anzeige im hellen wie im dunklen WebFront lesbar, ohne dass das
+        // Modul wissen muss, welches gerade laeuft.
+        $farbe = ["alarm" => "#e53935", "wichtig" => "#fb8c00",
+                  "normal" => "#1e88e5", "info" => "#9e9e9e"];
+
+        $h = '<div style="font:inherit;line-height:1.35">';
+
+        if (count($zeilen) === 0) {
+            $h .= '<div style="padding:10px 12px;opacity:.6">Keine offenen Meldungen.</div></div>';
+            $this->SetValue("Anzeige", $h);
+            // Muss geleert werden: Sonst behauptet die Kopfzeile noch Tage
+            // spaeter eine Meldung, die es nicht mehr gibt.
+            $this->SetValue("Letzte", "");
+            return;
+        }
+
+        $h .= '<div style="padding:2px 2px 8px 2px;opacity:.6;font-size:90%">'
+            . count($zeilen) . ' offene ' . (count($zeilen) === 1 ? 'Meldung' : 'Meldungen')
+            . '</div>';
+
         foreach ($zeilen as $m) {
-            $klasse = ($m["dringlichkeit"] === "alarm" || $m["dringlichkeit"] === "wichtig") ? " class=\"a\"" : "";
-            $h .= "<div><span" . $klasse . ">"
-                . htmlspecialchars($m["titel"] !== "" ? $m["titel"] : $m["ereignis"]) . "</span> "
-                . htmlspecialchars(mb_strimwidth((string)$m["text"], 0, 300, "..."))
-                . " <small>(" . date("d.m. H:i", $m["erstellt"]) . ")</small></div>";
+            $d = (string)$m["dringlichkeit"];
+            $c = $farbe[$d] ?? $farbe["info"];
+            $titel = $m["titel"] !== "" ? $m["titel"] : $m["ereignis"];
+            $text  = mb_strimwidth((string)$m["text"], 0, 300, "...");
+            $fett  = ($d === "alarm" || $d === "wichtig") ? "600" : "400";
+
+            $h .= '<div style="margin:0 0 6px 0;padding:7px 10px;border-left:4px solid ' . $c . ';'
+                . 'background:rgba(128,128,128,.14);border-radius:0 4px 4px 0">'
+                . '<div style="display:flex;justify-content:space-between;gap:10px">'
+                . '<span style="font-weight:' . $fett . '">' . htmlspecialchars($titel) . '</span>'
+                . '<span style="opacity:.6;font-size:88%;white-space:nowrap">'
+                . date("d.m. H:i", (int)$m["erstellt"]) . '</span></div>';
+            if ($text !== "") {
+                $h .= '<div style="opacity:.85;font-size:94%">' . htmlspecialchars($text) . '</div>';
+            }
+            if (count($m["aktionen"]) > 0) {
+                // Handeln laesst sich nur auf der Kachel - das gehoert dazu
+                // gesagt, sonst wartet man hier auf Knoepfe, die nie kommen.
+                $h .= '<div style="opacity:.6;font-size:86%;margin-top:2px">'
+                    . 'wartet auf Antwort &ndash; auf der Kachel zu bedienen</div>';
+            }
+            $h .= '</div>';
         }
-        $h .= "</div>";
+        $h .= '</div>';
+
         $this->SetValue("Anzeige", $h);
-        if (count($zeilen) > 0) {
-            $this->SetValue("Letzte", mb_strimwidth($zeilen[0]["titel"] . " " . $zeilen[0]["text"], 0, 200, "..."));
-        }
+        $this->SetValue("Letzte", mb_strimwidth($zeilen[0]["titel"] . " " . $zeilen[0]["text"], 0, 200, "..."));
     }
 
     // ==================================================================
