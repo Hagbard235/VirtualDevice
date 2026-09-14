@@ -261,7 +261,9 @@ class GeraetLauf extends IPSModule {
         }
 
         $this->SetValue("Info", sprintf(
-            "%s ist fertig, Tuer noch geschlossen - Waesche wartet.",
+            // Keine Aussage ueber die Tuer: Ihr Zustand beweist nichts, erst
+            // das Oeffnen nach dem Ende zaehlt.
+            "%s ist fertig - Waesche wartet aufs Ausraeumen.",
             $this->DeviceName()
         ));
     }
