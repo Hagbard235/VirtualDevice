@@ -23,6 +23,7 @@ class GeraetLauf extends IPSModule {
     const CMP_FALSCH = 5;
 
     // Quittierungsarten der ToDo-Zentrale.
+    const ACK_MANUELL     = 0;
     const ACK_AUTOMATISCH = 1;
     const ACK_BEIDES      = 2;
     const ACK_INFO        = 3;
@@ -113,6 +114,14 @@ class GeraetLauf extends IPSModule {
         $this->RegisterAttributeFloat("SpinAt", 0.0);
         $this->RegisterAttributeString("History", "[]");
 
+        // Tuer als Ereignis statt als Zustand. DoorLast: -1 unbekannt,
+        // 0 zu, 1 offen - unbekannt verhindert, dass der erste Wert nach
+        // einem Neustart als Oeffnen zaehlt.
+        $this->RegisterAttributeInteger("DoorLast", -1);
+        $this->RegisterAttributeFloat("DoorOpenedAt", 0.0);
+        $this->RegisterAttributeFloat("FinishedAt", 0.0);
+        $this->RegisterAttributeBoolean("DoorImplausible", false);
+
         $this->CreateProfiles();
 
         $this->RegisterVariableInteger("State", "Zustand", "GLF.State", 10);
@@ -174,6 +183,7 @@ class GeraetLauf extends IPSModule {
 
         $doorOpen = $this->IsDoorOpen();
         $this->SetValue("DoorOpen", $doorOpen);
+        $this->TrackDoor($doorOpen);
 
         $this->IntegrateEnergy($power);
         $this->TrackThresholds($power);
@@ -232,9 +242,12 @@ class GeraetLauf extends IPSModule {
     }
 
     private function HandleFertig(float $power, bool $doorOpen) {
-        // Tuer auf heisst: jemand war da. Damit ist nichts mehr auszuraeumen.
-        if ($doorOpen) {
-            $this->SendDebug("Zustand", "Tuer geoeffnet - Waesche gilt als entnommen", 0);
+        // Die Tuer ging NACH dem Programmende auf: jemand war da. Ob sie
+        // gerade offen steht, sagt dagegen nichts - Waschmaschinen bleiben
+        // zum Trocknen oft offen, und ein haengender Kontakt meldet ewig
+        // denselben Wert.
+        if ($this->ReadAttributeFloat("DoorOpenedAt") > $this->ReadAttributeFloat("FinishedAt")) {
+            $this->SendDebug("Zustand", "Tuer nach Programmende geoeffnet - Waesche gilt als entnommen", 0);
             $this->ClearToDo($this->IdentDone());
             $this->SetState(self::STATE_BEREIT, $this->DeviceName() . " ist leergeraeumt.");
             return;
@@ -263,6 +276,12 @@ class GeraetLauf extends IPSModule {
         $this->SetValue("RunStartVar", (int)$now);
         $this->SetValue("RunMinutes", 0);
         $this->SetState(self::STATE_LAEUFT, $this->DeviceName() . " hat gestartet.");
+
+        // Mit offener Tuer laeuft kein Programm an. Meldet der Kontakt das
+        // trotzdem, stimmt mit ihm etwas nicht - Batterie, Funk oder Magnet.
+        if ($this->DoorConfigured() && $this->IsDoorOpen()) {
+            $this->ReportDoorImplausible("meldet beim Programmstart eine offene Tuer");
+        }
 
         $this->ClearToDo($this->IdentDone());
 
@@ -302,22 +321,41 @@ class GeraetLauf extends IPSModule {
 
         $kwh = $this->ReadAttributeFloat("EnergyWs") / 3600000.0;
         $this->SetValue("EnergyRun", round($kwh, 3));
-        $this->RecordRun($elapsed, $kwh, $peak);
-
         $this->SetValue("RemainingMinutes", 0);
+        $finishedAt = microtime(true);
+        $this->WriteAttributeFloat("FinishedAt", $finishedAt);
+
+        // Wurde die Tuer waehrend dieses Laufs geoeffnet und steht noch offen,
+        // hat jemand das Geraet von Hand beendet und ist schon dabei - das
+        // ist ein beobachteter Wechsel, keine Vermutung.
+        if ($this->DoorConfigured() && $this->IsDoorOpen()
+            && $this->ReadAttributeFloat("DoorOpenedAt") >= $this->ReadAttributeFloat("RunStart")) {
+            $this->RecordRun($elapsed, $kwh, $peak);
+            $this->SetValue("RemainingMinutes", 0);
+            $this->SetState(self::STATE_BEREIT, sprintf(
+                "%s wurde waehrend des Laufs geoeffnet (%s, %.2f kWh) - keine Ausraeum-Meldung.",
+                $this->DeviceName(), $this->FormatMinutes($elapsed), $kwh
+            ));
+            return;
+        }
+
+        $this->RecordRun($elapsed, $kwh, $peak);
         $this->SetState(self::STATE_FERTIG, sprintf(
             "%s ist fertig (%s, %.2f kWh).",
             $this->DeviceName(), $this->FormatMinutes($elapsed), $kwh
         ));
 
-        // Die Aufgabe erledigt sich selbst, sobald die Tuer aufgeht. Das ist
-        // eine Bedingung auf den Zustand, kein einmaliges Ereignis.
-        $doorID = $this->ReadPropertyInteger("DoorID");
+        // Die Aufgabe wird hier bewusst OHNE Tuer-Bedingung an die
+        // ToDo-Zentrale gegeben. Deren Bedingung prueft den Zustand: Stand
+        // die Tuer beim Ende schon offen - zum Trocknen oder weil der
+        // Kontakt haengt -, entstand die Aufgabe gar nicht erst und niemand
+        // hoerte eine Ansage. Das Oeffnen NACH dem Ende erkennt dieses Modul
+        // selbst (HandleFertig) und raeumt die Aufgabe dann ab.
         $options = [
             'kategorie'   => $this->ReadPropertyString("Category"),
-            // Antippen erledigt sie ebenso wie das Oeffnen der Tuer - je
-            // nachdem, was zuerst passiert.
-            'quittierung' => self::ACK_BEIDES,
+            // Antippen erledigt sie jederzeit; die Tuer erledigt sie ueber
+            // HandleFertig.
+            'quittierung' => self::ACK_MANUELL,
             'prio'        => $this->ReadPropertyInteger("DonePriority"),
             'farbe'       => "ROT",
             'schalter'    => "...Fertig!...",
@@ -328,11 +366,6 @@ class GeraetLauf extends IPSModule {
             'erinnerungMax' => $this->ReadPropertyInteger("RemindMax"),
             'sprechen'    => self::SPEAK_NEU | self::SPEAK_ERINNERUNG
         ];
-
-        if ($doorID > 0) {
-            $options['clearVar'] = $doorID;
-            $options['clearMode'] = $this->ReadPropertyBoolean("DoorOpenWhenFalse") ? self::CMP_FALSCH : self::CMP_WAHR;
-        }
 
         $suppressID = $this->ReadPropertyInteger("SuppressVarID");
         if ($suppressID > 0) {
@@ -405,6 +438,63 @@ class GeraetLauf extends IPSModule {
         $start = $this->ReadAttributeFloat("RunStart");
         if ($start <= 0) return 0.0;
         return (microtime(true) - $start) / 60.0;
+    }
+
+    private function DoorConfigured(): bool {
+        $doorID = $this->ReadPropertyInteger("DoorID");
+        return $doorID > 0 && IPS_VariableExists($doorID);
+    }
+
+    /**
+     * Merkt sich, wann die Tuer zuletzt von zu auf offen gewechselt hat.
+     *
+     * Die Variable wird auch ohne Aenderung aktualisiert - zigbee2mqtt
+     * schickt nach einem Neustart den alten Wert erneut. Deshalb der
+     * Vergleich mit dem zuletzt gesehenen Wert statt der Meldung selbst.
+     */
+    private function TrackDoor(bool $open) {
+        if (!$this->DoorConfigured()) return;
+        $last = $this->ReadAttributeInteger("DoorLast");
+        if ($last === 0 && $open) {
+            $this->WriteAttributeFloat("DoorOpenedAt", microtime(true));
+            $this->SendDebug("Tuer", "geoeffnet", 0);
+        }
+        // Die Tuer wurde zu gesehen: Der Kontakt arbeitet also wieder.
+        if (!$open && $this->ReadAttributeBoolean("DoorImplausible")) {
+            $this->WriteAttributeBoolean("DoorImplausible", false);
+            $this->ClearToDo($this->IdentDoorCheck());
+            $this->SendDebug("Tuer", "Kontakt wieder plausibel", 0);
+        }
+        $this->WriteAttributeInteger("DoorLast", $open ? 1 : 0);
+    }
+
+    /**
+     * Unplausibler Tuerzustand dieses Geraets - als stille Aufgabe, nicht als
+     * Ansage: Ein verrutschter Magnet ist kein Grund, nachts jemanden zu
+     * wecken. Die Aufgabe verschwindet von selbst, sobald der Kontakt
+     * wieder "zu" meldet.
+     *
+     * Ausgefallene Komponenten allgemein - Sensoren, die sich gar nicht mehr
+     * melden - sind Sache eines eigenen Watchdogs, nicht dieses Moduls.
+     */
+    private function ReportDoorImplausible(string $grund) {
+        $this->SendDebug("Tuer", "Unplausibel: " . $grund, 0);
+        if ($this->ReadAttributeBoolean("DoorImplausible")) return;
+        $this->WriteAttributeBoolean("DoorImplausible", true);
+        $this->SetToDo($this->IdentDoorCheck(), "Tuerkontakt " . $this->DeviceName() . " pruefen", [
+            'kategorie'   => $this->ReadPropertyString("Category"),
+            'quittierung' => self::ACK_MANUELL,
+            'prio'        => 1,
+            'farbe'       => "GELB",
+            'schalter'    => "...pruefen...",
+            'sprache'     => $this->DeviceName() . " " . $grund . ". Der Tuerkontakt ist vermutlich defekt.",
+            'erinnerung'  => 0,
+            'sprechen'    => 0
+        ]);
+    }
+
+    private function IdentDoorCheck(): string {
+        return $this->IdentDone() . "_TUERKONTAKT";
     }
 
     private function IsDoorOpen(): bool {
