@@ -98,6 +98,13 @@ class GeraetLauf extends IPSModule {
         $this->RegisterPropertyInteger("SuppressVarID", 0);
         $this->RegisterPropertyBoolean("SuppressWhenTrue", true);
 
+        // Technikhinweise - unplausible Zustaende dieses Geraets. Sie gehen
+        // an eine Person der Meldungszentrale, nicht an alle: Wer mit
+        // "Tuerkontakt pruefen" nichts anfangen kann, soll es nicht lesen.
+        // Ohne Meldungszentrale bleibt es bei einer stillen Aufgabe.
+        $this->RegisterPropertyInteger("NoticeInstanceID", 0);
+        $this->RegisterPropertyString("NoticeRecipient", "");
+
         $this->RegisterPropertyInteger("CheckInterval", 30);
 
         // --- Attribute ---
@@ -121,6 +128,11 @@ class GeraetLauf extends IPSModule {
         $this->RegisterAttributeFloat("DoorOpenedAt", 0.0);
         $this->RegisterAttributeFloat("FinishedAt", 0.0);
         $this->RegisterAttributeBoolean("DoorImplausible", false);
+        // Die Fertig-Aufgabe wurde angelegt und ist seitdem nicht von diesem
+        // Modul entfernt worden. Verschwindet sie trotzdem, hat jemand sie
+        // auf der Kachel abgehakt.
+        $this->RegisterAttributeBoolean("DoneToDoActive", false);
+        $this->RegisterAttributeString("NoticeMessageID", "");
 
         $this->CreateProfiles();
 
@@ -253,6 +265,16 @@ class GeraetLauf extends IPSModule {
             return;
         }
 
+        // Auf der Kachel abgehakt: Wer das tut, hat ausgeraeumt - oder
+        // ueberbrueckt bewusst einen ausgefallenen Tuerkontakt. Beides heisst,
+        // dass hier nichts mehr wartet.
+        if ($this->ReadAttributeBoolean("DoneToDoActive") && !$this->ToDoExists($this->IdentDone())) {
+            $this->WriteAttributeBoolean("DoneToDoActive", false);
+            $this->SendDebug("Zustand", "Aufgabe auf der Kachel abgehakt", 0);
+            $this->SetState(self::STATE_BEREIT, $this->DeviceName() . " wurde als ausgeraeumt abgehakt.");
+            return;
+        }
+
         // Ein neuer Programmstart beendet den Fertig-Zustand ebenfalls.
         if ($this->HeldFor("AboveSince", $this->ReadPropertyInteger("StartHoldSeconds"))) {
             $this->ClearToDo($this->IdentDone());
@@ -375,7 +397,10 @@ class GeraetLauf extends IPSModule {
             $options['stummMode'] = $this->ReadPropertyBoolean("SuppressWhenTrue") ? self::CMP_WAHR : self::CMP_FALSCH;
         }
 
-        $this->SetToDo($this->IdentDone(), $this->TextDone(), $options);
+        $angelegt = $this->SetToDo($this->IdentDone(), $this->TextDone(), $options);
+        // Nur eine tatsaechlich angelegte Aufgabe kann spaeter abgehakt
+        // werden - sonst saehe ein fehlgeschlagenes Anlegen wie Abhaken aus.
+        $this->WriteAttributeBoolean("DoneToDoActive", $angelegt);
     }
 
     private function SetState(int $state, string $info) {
@@ -465,6 +490,7 @@ class GeraetLauf extends IPSModule {
         if (!$open && $this->ReadAttributeBoolean("DoorImplausible")) {
             $this->WriteAttributeBoolean("DoorImplausible", false);
             $this->ClearToDo($this->IdentDoorCheck());
+            $this->WithdrawNotice();
             $this->SendDebug("Tuer", "Kontakt wieder plausibel", 0);
         }
         $this->WriteAttributeInteger("DoorLast", $open ? 1 : 0);
@@ -483,6 +509,15 @@ class GeraetLauf extends IPSModule {
         $this->SendDebug("Tuer", "Unplausibel: " . $grund, 0);
         if ($this->ReadAttributeBoolean("DoorImplausible")) return;
         $this->WriteAttributeBoolean("DoorImplausible", true);
+
+        $titel = "Tuerkontakt " . $this->DeviceName() . " pruefen";
+        $text  = $this->DeviceName() . " " . $grund . ". Der Tuerkontakt ist vermutlich defekt oder verrutscht.";
+        if ($this->NoticeConfigured()) {
+            $this->SendNotice($this->IdentDoorCheck(), $titel, $text);
+            return;
+        }
+
+        // Ohne Meldungszentrale: stille Aufgabe, damit es nicht verloren geht.
         $this->SetToDo($this->IdentDoorCheck(), "Tuerkontakt " . $this->DeviceName() . " pruefen", [
             'kategorie'   => $this->ReadPropertyString("Category"),
             'quittierung' => self::ACK_MANUELL,
@@ -493,6 +528,49 @@ class GeraetLauf extends IPSModule {
             'erinnerung'  => 0,
             'sprechen'    => 0
         ]);
+    }
+
+    private function NoticeConfigured(): bool {
+        $id = $this->ReadPropertyInteger("NoticeInstanceID");
+        return $id > 0 && IPS_InstanceExists($id) && trim($this->ReadPropertyString("NoticeRecipient")) !== ""
+            && function_exists("MZ_Melden");
+    }
+
+    /**
+     * Technikhinweis an die eingestellte Person.
+     *
+     * Vertraulich, weil die Meldungszentrale nur so auch die gemeinsame
+     * Anzeige ausspart: Eine an eine Person adressierte Meldung erschiene
+     * sonst trotzdem auf der Kachel, die alle sehen. Vertraulich heisst hier
+     * also "nur fuer diese Person", nicht "geheim".
+     */
+    private function SendNotice(string $schluessel, string $titel, string $text) {
+        $antwort = @MZ_Melden($this->ReadPropertyInteger("NoticeInstanceID"), json_encode([
+            "quelle"        => "geraetlauf",
+            "titel"         => $titel,
+            "text"          => $text,
+            "dringlichkeit" => "normal",
+            "empfaenger"    => [trim($this->ReadPropertyString("NoticeRecipient"))],
+            "vertraulich"   => true,
+            "dedupKey"      => $schluessel . "-" . date("Y-m-d-H-i")
+        ], JSON_UNESCAPED_UNICODE));
+        $d = json_decode((string)$antwort, true);
+        if (is_array($d) && ($d["ok"] ?? false)) {
+            $this->WriteAttributeString("NoticeMessageID", (string)$d["meldungID"]);
+            return;
+        }
+        // Nicht auf die gemeinsame Kachel ausweichen - das waere genau das,
+        // was nicht sein soll. Ins Log, damit es nachvollziehbar bleibt.
+        IPS_LogMessage("GeraetLauf", $this->DeviceName() . ": Technikhinweis nicht angenommen: " . (string)$antwort);
+    }
+
+    private function WithdrawNotice() {
+        $id = $this->ReadAttributeString("NoticeMessageID");
+        if ($id === "") return;
+        $this->WriteAttributeString("NoticeMessageID", "");
+        if ($this->NoticeConfigured() && function_exists("MZ_Zurueckziehen")) {
+            @MZ_Zurueckziehen($this->ReadPropertyInteger("NoticeInstanceID"), $id);
+        }
     }
 
     private function IdentDoorCheck(): string {
@@ -693,18 +771,30 @@ class GeraetLauf extends IPSModule {
         return $ident;
     }
 
-    private function SetToDo(string $ident, string $text, array $options) {
+    private function SetToDo(string $ident, string $text, array $options): bool {
         $instanceID = $this->ReadPropertyInteger("ToDoInstanceID");
-        if ($ident === "" || $instanceID <= 0 || !IPS_InstanceExists($instanceID)) return;
+        if ($ident === "" || $instanceID <= 0 || !IPS_InstanceExists($instanceID)) return false;
         if (!function_exists("TODO_Set")) {
             $this->SendDebug("ToDo", "TODO_Set nicht verfuegbar - ist die ToDo-Zentrale installiert?", 0);
-            return;
+            return false;
         }
         $this->SendDebug("ToDo", "Setze '$ident': $text", 0);
-        @TODO_Set($instanceID, $ident, $text, json_encode($options));
+        return (bool)@TODO_Set($instanceID, $ident, $text, json_encode($options));
+    }
+
+    /**
+     * Existiert die Aufgabe noch? Laesst sich das nicht pruefen, gilt sie als
+     * vorhanden - ein Fehler darf nicht wie Abhaken aussehen.
+     */
+    private function ToDoExists(string $ident): bool {
+        $instanceID = $this->ReadPropertyInteger("ToDoInstanceID");
+        if ($ident === "" || $instanceID <= 0 || !IPS_InstanceExists($instanceID)) return true;
+        if (!function_exists("TODO_Exists")) return true;
+        return (bool)@TODO_Exists($instanceID, $ident);
     }
 
     private function ClearToDo(string $ident) {
+        if ($ident === $this->IdentDone()) $this->WriteAttributeBoolean("DoneToDoActive", false);
         $instanceID = $this->ReadPropertyInteger("ToDoInstanceID");
         if ($ident === "" || $instanceID <= 0 || !IPS_InstanceExists($instanceID)) return;
         if (!function_exists("TODO_Clear")) return;

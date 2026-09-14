@@ -261,6 +261,27 @@
     },
     {
       "type": "ExpansionPanel",
+      "caption": "Technikhinweise",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Unplausible Zustaende dieses Geraets, etwa ein Tuerkontakt, der beim Programmstart \"offen\" meldet. Sie gehen vertraulich an eine Person der Meldungszentrale - andere Hausbewohner sehen sie nicht. Ohne Eintrag erscheinen sie als stille Aufgabe in der ToDo-Zentrale. Die Quellkennung \"geraetlauf\" muss in der Meldungszentrale angelegt sein."
+        },
+        {
+          "type": "SelectInstance",
+          "name": "NoticeInstanceID",
+          "caption": "Meldungszentrale",
+          "width": "600px"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "NoticeRecipient",
+          "caption": "Empfaenger (Schluessel in der Meldungszentrale, z.B. andre)"
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
       "caption": "Sonstiges",
       "items": [
         {
