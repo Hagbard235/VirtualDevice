@@ -260,6 +260,12 @@ class Meldungszentrale extends IPSModule {
         }
 
         $vertraulich = (bool)($opt["vertraulich"] ?? false);
+        // Ausdruecklich auch an alle: Die globalen Kanaele bekommen die
+        // Meldung zusaetzlich zu Zone oder Person. Ohne dieses Feld erhielte
+        // eine Raumansage nie eine Push - gewollt, damit nicht jede Ansage auf
+        // allen Handys landet. Ob wirklich gepusht wird, entscheidet danach
+        // die Mindestdringlichkeit des jeweiligen Kanals.
+        $anAlle = (bool)($opt["anAlle"] ?? false);
         $finger = $this->Fingerabdruck($quelle, $ereignis, $titel, $text, $dring, $vertraulich, $zonen, $empf, $aktionen);
         $dedupKey = trim((string)($opt["dedupKey"] ?? ""));
 
@@ -343,6 +349,7 @@ class Meldungszentrale extends IPSModule {
             "text"          => $text,
             "dringlichkeit" => $dring,
             "vertraulich"   => $vertraulich,
+            "anAlle"        => $anAlle,
             "zone"          => $zonen,
             "empfaenger"    => $empf,
             "erstellt"      => $jetzt,
@@ -457,8 +464,9 @@ class Meldungszentrale extends IPSModule {
             if ($k["Adressierung"] === "person" && in_array($k["EmpfaengerKey"], $m["empfaenger"])) $passt = true;
             if ($k["Adressierung"] === "global") {
                 // Globale Kanaele kommen bei adressierten Meldungen nur dazu,
-                // wenn sie "immer" sind (die Anzeige).
-                $passt = !$hatAdresse || $k["Zustellmodus"] === "immer";
+                // wenn sie "immer" sind (die Anzeige) oder die Meldung
+                // ausdruecklich an alle geht.
+                $passt = !$hatAdresse || $k["Zustellmodus"] === "immer" || !empty($m["anAlle"]);
             }
             if ($passt) $out[] = $k;
         }
