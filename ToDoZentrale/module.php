@@ -458,7 +458,8 @@ class ToDoZentrale extends IPSModule {
             $texts = [];
             foreach ($speakable as $item) $texts[] = $this->SpeechText($item);
             $text = "Es stehen " . count($texts) . " Dinge an: " . implode(", ", $texts) . ".";
-            $this->SpeakRaw($text, [], true);
+            // Die Sammelansage ist so wichtig wie ihr wichtigster Teil.
+            $this->SpeakRaw($text, [], true, "", "", max(array_column($speakable, 'priority')));
             return;
         }
 
@@ -699,7 +700,7 @@ class ToDoZentrale extends IPSModule {
         $event = ($useEvent && isset($item['speechEvent'])) ? (string)$item['speechEvent'] : "";
         // Der Aufgabentext dient als Titel - er ist kurz und benennt die Sache,
         // waehrend der gesprochene Text ein ganzer Satz sein darf.
-        $this->SpeakRaw($text, $targets, true, $item['text'], $event);
+        $this->SpeakRaw($text, $targets, true, $item['text'], $event, (int)$item['priority']);
     }
 
     /**
@@ -710,8 +711,12 @@ class ToDoZentrale extends IPSModule {
      * @param string $event        Kennung einer vordefinierten Ansage, die dem
      *                             Zielskript als 'Event' mitgegeben wird. Ziele,
      *                             die freien Text sprechen, ignorieren sie.
+     * @param int    $priority     Prioritaet der Aufgabe, als 'Prioritaet' an das
+     *                             Zielskript. -1 = unbekannt (direkter Aufruf).
+     *                             Ohne sie kam bei einer nachgelagerten Zentrale
+     *                             jede Aufgabe gleich wichtig an.
      */
-    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "", string $event = "") {
+    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "", string $event = "", int $priority = -1) {
         $text = trim($text);
         if ($text === "") return;
 
@@ -746,9 +751,10 @@ class ToDoZentrale extends IPSModule {
 
             if ($scriptID > 0 && IPS_ScriptExists($scriptID)) {
                 // Parameternamen bewusst wie im bisherigen Ansageskript.
-                // 'Event' kam spaeter dazu und ist meist leer - ein Skript, das
-                // den Parameter nicht kennt, ignoriert ihn folgenlos.
-                @IPS_RunScriptEx($scriptID, ['Titel' => $useTitle, 'Text' => $text, 'Event' => $event]);
+                // 'Event' und 'Prioritaet' kamen spaeter dazu - ein Skript, das
+                // sie nicht kennt, ignoriert sie folgenlos.
+                @IPS_RunScriptEx($scriptID, ['Titel' => $useTitle, 'Text' => $text, 'Event' => $event,
+                                             'Prioritaet' => $priority]);
                 $delivered++;
             } elseif ($variableID > 0 && IPS_VariableExists($variableID)) {
                 @RequestAction($variableID, $text);
