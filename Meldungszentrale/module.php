@@ -286,19 +286,19 @@ class Meldungszentrale extends IPSModule {
                     return ["ok" => false, "fehlercode" => "dedup_konflikt", "meldungID" => $vorhanden["meldungID"]];
                 }
                 return $this->Anlegen($q, $quelle, $ereignis, $titel, $text, $dring, $vertraulich,
-                                      $zonen, $empf, $aktionen, $sek, $dedupKey, $finger, $warnungen);
+                                      $zonen, $empf, $aktionen, $sek, $dedupKey, $finger, $warnungen, $anAlle);
             } finally {
                 IPS_SemaphoreLeave($lock);
             }
         }
         return $this->Anlegen($q, $quelle, $ereignis, $titel, $text, $dring, $vertraulich,
-                              $zonen, $empf, $aktionen, $sek, "", $finger, $warnungen);
+                              $zonen, $empf, $aktionen, $sek, "", $finger, $warnungen, $anAlle);
     }
 
     private function Anlegen(array $q, string $quelle, string $ereignis, string $titel, string $text,
                              string $dring, bool $vertraulich, array $zonen, array $empf,
                              array $aktionen, int $sek, string $dedupKey, string $finger,
-                             array $warnungen): array {
+                             array $warnungen, bool $anAlle = false): array {
 
         // --- 6. Flutschutz ------------------------------------------------
         // Der RateKey wird SERVERSEITIG gebildet. Ein im Aufruf mitgesandter
