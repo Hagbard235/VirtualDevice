@@ -1,0 +1,85 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "Prueft eine gepflegte Liste von Komponenten mit der Regel ihres Systems und meldet, wenn eine ausfaellt oder zurueckkommt. Was schon beim Aufnehmen gestoert ist, gilt als Altbestand und erscheint nur in der Uebersicht."
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Komponenten",
+      "expanded": true,
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Regeln: instanzstatus (Gateways, Sockets, MQTT - Fehler ab Status 200), homematic (Wartungskanal :0 bzw. MAINTENANCE), zigbee2mqtt (Geraeteinstanz, neues Modul oder alter Topic-Weg), wertalter (Variable, die regelmaessig kommen muss). Bruecke: Schluessel der Komponente, ueber die dieses Geraet angebunden ist. Schwelle 0 = Vorgabe."
+        },
+        {
+          "type": "List",
+          "name": "Komponenten",
+          "caption": "Ueberwachte Komponenten",
+          "rowCount": 15,
+          "add": true,
+          "delete": true,
+          "sort": { "column": "Key", "direction": "ascending" },
+          "columns": [
+            { "caption": "Aktiv", "name": "Aktiv", "width": "60px", "add": true, "edit": { "type": "CheckBox" } },
+            { "caption": "Schluessel", "name": "Key", "width": "170px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Name", "name": "Name", "width": "220px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Regel", "name": "Regel", "width": "130px", "add": "instanzstatus",
+              "edit": { "type": "Select", "options": [
+                { "caption": "instanzstatus", "value": "instanzstatus" },
+                { "caption": "homematic", "value": "homematic" },
+                { "caption": "zigbee2mqtt", "value": "zigbee2mqtt" },
+                { "caption": "wertalter", "value": "wertalter" } ] } },
+            { "caption": "Objekt", "name": "ObjektID", "width": "220px", "add": 0, "edit": { "type": "SelectObject" } },
+            { "caption": "Schwelle (min)", "name": "SchwelleMinuten", "width": "110px", "add": 0, "edit": { "type": "NumberSpinner", "minimum": 0 } },
+            { "caption": "Bruecke", "name": "Bruecke", "width": "130px", "add": "", "edit": { "type": "ValidationTextBox" } },
+            { "caption": "Gewicht", "name": "Gewicht", "width": "110px", "add": "allgemein",
+              "edit": { "type": "Select", "options": [
+                { "caption": "sicherheit", "value": "sicherheit" },
+                { "caption": "funktion", "value": "funktion" },
+                { "caption": "allgemein", "value": "allgemein" } ] } },
+            { "caption": "Modus", "name": "Modus", "width": "90px", "add": "aktiv",
+              "edit": { "type": "Select", "options": [
+                { "caption": "aktiv", "value": "aktiv" },
+                { "caption": "ruhend", "value": "ruhend" } ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Meldungen",
+      "items": [
+        { "type": "Label", "caption": "Sicherheit und Funktion melden Ausfaelle sofort, Sicherheit auch Wartung. Alles andere sammelt die Tagesuebersicht. Gemeldet wird vertraulich an den Empfaenger - die gemeinsame Anzeige bleibt aussen vor." },
+        { "type": "SelectInstance", "name": "MeldungszentraleID", "caption": "Meldungszentrale", "width": "500px" },
+        { "type": "ValidationTextBox", "name": "Empfaenger", "caption": "Empfaenger (Schluessel in der Meldungszentrale)" },
+        { "type": "ValidationTextBox", "name": "Quelle", "caption": "Quellkennung (muss in der Meldungszentrale angelegt sein)" },
+        { "type": "ValidationTextBox", "name": "Tagesuebersicht", "caption": "Tagesuebersicht um (HH:MM)" },
+        { "type": "CheckBox", "name": "MeldenAktiv", "caption": "Meldungen senden (aus = nur Protokoll, fuer Tests)" }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Feinabstimmung",
+      "items": [
+        { "type": "NumberSpinner", "name": "PruefintervallMinuten", "caption": "Pruefintervall (min)", "minimum": 1 },
+        { "type": "NumberSpinner", "name": "Entprellung", "caption": "Gestoerte Pruefungen in Folge bis zur Meldung", "minimum": 1 },
+        { "type": "NumberSpinner", "name": "KarenzMinuten", "caption": "Karenz nach Rueckkehr einer Bruecke (min)", "minimum": 0 },
+        { "type": "NumberSpinner", "name": "SchwelleStandardMinuten", "caption": "Standardschwelle fuer Stille (min, 1500 = 25 h)", "minimum": 1 },
+        { "type": "NumberSpinner", "name": "BatterieProzent", "caption": "Batterie gilt als schwach ab (%)", "minimum": 0, "maximum": 100 },
+        { "type": "NumberSpinner", "name": "ConfigPendingStunden", "caption": "Homematic CONFIG_PENDING meldet nach (h)", "minimum": 1 },
+        { "type": "NumberSpinner", "name": "SammelausfallProzent", "caption": "Sammelausfall einer Bruecke ab (% der Geraete dahinter still)", "minimum": 1, "maximum": 100 }
+      ]
+    }
+  ],
+  "actions": [
+    { "type": "Button", "caption": "Jetzt pruefen", "onClick": "KWD_Pruefen($id);" },
+    { "type": "Button", "caption": "Tagesuebersicht jetzt senden", "onClick": "KWD_TagesuebersichtSenden($id);" },
+    { "type": "Button", "caption": "Zustaende anzeigen", "onClick": "echo KWD_Status($id);" }
+  ],
+  "status": [
+    { "code": 102, "icon": "active", "caption": "Aktiv" },
+    { "code": 201, "icon": "error", "caption": "Komponentenliste fehlerhaft - siehe Debug" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+    "id": "{1FB39446-4434-4750-92E3-7DED24521EC3}",
+    "name": "Komponentenwatchdog",
+    "type": 3,
+    "vendor": "Custom",
+    "aliases":
+    [
+        "Watchdog",
+        "Komponentenwatchdog",
+        "Ausfallueberwachung"
+    ],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "KWD"
+}
