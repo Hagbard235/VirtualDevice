@@ -185,18 +185,37 @@ class Komponentenwatchdog extends IPSModule {
         //    jede Bruecke dauerhaft verdaechtig.
         $prozent = max(1, $this->ReadPropertyInteger("SammelausfallProzent"));
         foreach ($abhaengige as $b => $keys) {
-            if (!isset($befund[$b]) || $befund[$b]["status"] !== self::B_OK) continue;
-            $gesamt = 0; $still = 0;
+            if (!isset($befund[$b])) continue;
+            $gesamt = 0; $still = 0; $lebend = 0;
             foreach ($keys as $key) {
                 if (!isset($befund[$key])) continue;
                 $zz = $zust[$key]["zustand"] ?? self::Z_UNBEKANNT;
                 if ($zz !== self::Z_OK && $zz !== self::Z_GESTOERT) continue;
                 $gesamt++;
                 if ($befund[$key]["status"] === self::B_GESTOERT) $still++;
+                if ($befund[$key]["status"] === self::B_OK) $lebend++;
             }
+            $grund = "Sammelausfall: " . $still . " von " . $gesamt . " Komponenten dahinter still";
+
+            // Wegen Sammelausfall gestoert: wieder da, sobald IRGENDETWAS
+            // durchkommt. Wuerde sie erst bei der Mehrheit wieder freigegeben,
+            // blieben wirklich ausgefallene Geraete dahinter fuer immer
+            // eingefroren und wuerden nie einzeln gemeldet.
+            $zb = $zust[$b] ?? [];
+            if (($zb["zustand"] ?? "") === self::Z_GESTOERT && !empty($zb["sammelausfall"])) {
+                if ($lebend === 0 && $gesamt > 0) {
+                    $befund[$b]["status"] = self::B_GESTOERT;
+                    $befund[$b]["grund"] = $grund;
+                }
+                $befund[$b]["sammelausfall"] = true;
+                continue;
+            }
+
+            if ($befund[$b]["status"] !== self::B_OK) continue;
             if ($gesamt >= 3 && $still * 100 >= $gesamt * $prozent) {
                 $befund[$b]["status"] = self::B_GESTOERT;
-                $befund[$b]["grund"] = "Sammelausfall: " . $still . " von " . $gesamt . " Komponenten dahinter still";
+                $befund[$b]["grund"] = $grund;
+                $befund[$b]["sammelausfall"] = true;
             }
         }
 
@@ -269,6 +288,9 @@ class Komponentenwatchdog extends IPSModule {
                     $z["zaehler"] = (int)$z["zaehler"] + 1;
                     if ($z["zaehler"] >= max(1, $this->ReadPropertyInteger("Entprellung"))) {
                         $z["zustand"] = self::Z_GESTOERT; $z["seit"] = $jetzt; $z["grund"] = $b["grund"]; $z["zaehler"] = 0;
+                        // Merken, woran der Ausfall erkannt wurde - davon haengt ab,
+                        // wann die Bruecke wieder als da gilt.
+                        $z["sammelausfall"] = !empty($b["sammelausfall"]);
                         $z = $this->Ereignis($k, $key, "gestoert", $b["grund"], $z, $anzahlAbhaengige);
                     }
                 } else {
@@ -281,6 +303,7 @@ class Komponentenwatchdog extends IPSModule {
                     $alterGrund = $z["grund"];
                     $z = $this->Ereignis($k, $key, "entwarnung", $alterGrund, $z, $anzahlAbhaengige);
                     $z["zustand"] = self::Z_OK; $z["seit"] = $jetzt; $z["okSeit"] = $jetzt; $z["grund"] = "";
+                    $z["sammelausfall"] = false;
                 } elseif ($status === self::B_GESTOERT) {
                     $z["grund"] = $b["grund"];
                 }
