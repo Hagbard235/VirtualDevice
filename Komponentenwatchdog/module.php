@@ -30,6 +30,12 @@ class Komponentenwatchdog extends IPSModule {
     const B_OK        = "ok";
     const B_GESTOERT  = "gestoert";
     const B_UNBEKANNT = "unbekannt";
+    // Die Quelle der Wahrheit ist gerade nicht abfragbar (z. B. CCU). Dann
+    // bleibt der Zustand, wie er ist - statt fuer jedes Geraet Wartung zu melden.
+    const B_AUSSETZEN = "aussetzen";
+
+    /** Servicemeldungen je CCU-Socket, einmal pro Pruefzyklus gelesen. */
+    private $ccuCache = [];
 
     const REGELN   = ["instanzstatus", "homematic", "zigbee2mqtt", "wertalter"];
     const GEWICHTE = ["sicherheit", "funktion", "allgemein"];
@@ -58,6 +64,9 @@ class Komponentenwatchdog extends IPSModule {
         $this->RegisterAttributeString("Zustaende", "{}");
         $this->RegisterAttributeString("Tagesliste", "[]");
         $this->RegisterAttributeString("Protokoll", "[]");
+        // Seit wann eine voruebergehende CCU-Servicemeldung (CONFIG_PENDING)
+        // ansteht - sie zaehlt erst nach der eingestellten Dauer.
+        $this->RegisterAttributeString("CCUErstGesehen", "{}");
 
         $this->RegisterVariableInteger("LetztePruefung", "Letzte Pruefung", "~UnixTimestamp", 10);
         $this->RegisterVariableInteger("AnzahlGestoert", "Gestoert", "", 20);
@@ -153,6 +162,12 @@ class Komponentenwatchdog extends IPSModule {
         if (!is_array($z)) $z = [];
         if ($Key === "") $z = []; else unset($z[$Key]);
         $this->WriteAttributeString("Zustaende", json_encode($z));
+
+        // Was ueber die Komponente gesammelt wurde, gilt ebenfalls nicht mehr.
+        $t = json_decode($this->ReadAttributeString("Tagesliste"), true);
+        if (!is_array($t)) $t = [];
+        $t = $Key === "" ? [] : array_values(array_filter($t, function ($e) use ($Key) { return ($e["key"] ?? "") !== $Key; }));
+        $this->WriteAttributeString("Tagesliste", json_encode($t, JSON_UNESCAPED_UNICODE));
     }
 
     // ==================================================================
@@ -172,10 +187,12 @@ class Komponentenwatchdog extends IPSModule {
         }
 
         // 1. Befunde
+        $this->ccuCache = [];
         $befund = [];
         foreach ($liste as $key => $k) {
             if ($this->Ueberwacht($k)) $befund[$key] = $this->Befund($k);
         }
+        $this->CCUErstGesehenAufraeumen();
 
         // 2. Sammelausfall: Verstummt die Mehrheit der Geraete hinter einer
         //    Bruecke gleichzeitig, ist die Bruecke das Problem - auch wenn sie
@@ -254,6 +271,13 @@ class Komponentenwatchdog extends IPSModule {
                 continue;
             }
             $z["hinterBruecke"] = false;
+            if ($befund[$key]["status"] === self::B_AUSSETZEN) {
+                // Quelle nicht abfragbar: nichts schliessen, nichts melden.
+                $z["grundAussetzen"] = $befund[$key]["grund"];
+                $zust[$key] = $z;
+                continue;
+            }
+            unset($z["grundAussetzen"]);
             $inKarenz = $br !== "" && (int)($zust[$br]["okSeit"] ?? 0) > $jetzt - $karenz;
 
             $zust[$key] = $this->Uebergang($key, $k, $z, $befund[$key], $inKarenz, count($abhaengige[$key] ?? []), $jetzt);
@@ -467,27 +491,94 @@ class Komponentenwatchdog extends IPSModule {
     }
 
     /**
-     * Homematic: Die CCU meldet Erreichbarkeit und Batterie selbst, im
-     * Wartungskanal (":0" bzw. MAINTENANCE). Ausgewertet wird der Wert.
+     * Homematic: Massgeblich sind die Servicemeldungen der CCU selbst
+     * (HM_ReadServiceMessages am Socket) - nicht die Variablen in Symcon.
+     *
+     * Die Variablen sind nur eine Kopie, und die kann einfrieren: Beim
+     * Rauchmelder Schlafzimmer stand LOWBAT seit Mai 2025 unveraendert auf
+     * wahr, beim Funkausloeser UNREACH seit August 2023 - die CCU meldete fuer
+     * beide laengst nichts mehr. Der erste Lauf hat deshalb zwei falsche
+     * Wartungsmeldungen verschickt.
      */
     private function RegelHomematic(array $k): array {
-        $v = $this->Kinder($k["ObjektID"]);
-        if (!isset($v["unreach"])) {
-            return $this->Ergebnis(self::B_UNBEKANNT, "kein UNREACH unter Objekt " . $k["ObjektID"] . " - ist das der Wartungskanal?");
-        }
-        $wartung = null;
-        $lowbat = $v["lowbat"] ?? ($v["low_bat"] ?? null);
-        if ($lowbat !== null && GetValue($lowbat) === true) $wartung = "Batterie schwach";
-        if ($wartung === null && isset($v["config_pending"]) && GetValue($v["config_pending"]) === true) {
-            $alter = time() - IPS_GetVariable($v["config_pending"])["VariableChanged"];
-            if ($alter > max(1, $this->ReadPropertyInteger("ConfigPendingStunden")) * 3600) {
-                $wartung = "Konfiguration hängt seit " . $this->Dauer($alter);
+        $id = $k["ObjektID"];
+        if (!IPS_InstanceExists($id)) return $this->Ergebnis(self::B_UNBEKANNT, "Instanz " . $id . " existiert nicht");
+        $adresse = (string)(json_decode(IPS_GetConfiguration($id), true)["Address"] ?? "");
+        if ($adresse === "") return $this->Ergebnis(self::B_UNBEKANNT, "Objekt " . $id . " hat keine Homematic-Adresse");
+        $geraet = explode(":", $adresse)[0];
+
+        $meldungen = $this->CCUServicemeldungen((int)IPS_GetInstance($id)["ConnectionID"]);
+        if ($meldungen === null) return $this->Ergebnis(self::B_AUSSETZEN, "CCU nicht abfragbar");
+
+        $gestoert = null; $wartung = null;
+        foreach ($meldungen as $m) {
+            $a = (string)($m["Address"] ?? "");
+            if ($a !== $adresse && strpos($a, $geraet . ":") !== 0) continue;
+            if (empty($m["Value"])) continue;
+            $art = strtoupper((string)($m["Message"] ?? ""));
+            switch ($art) {
+                case "UNREACH":
+                    $gestoert = "nicht erreichbar (laut CCU)"; break;
+                case "SABOTAGE":
+                case "ERROR_SABOTAGE":
+                    $gestoert = $gestoert ?? "Sabotage gemeldet (laut CCU)"; break;
+                case "STICKY_UNREACH":
+                case "STICKY_SABOTAGE":
+                    // "war gestoert" - Vergangenheit, kein aktueller Befund.
+                    break;
+                case "LOWBAT":
+                case "LOW_BAT":
+                    $wartung = "Batterie schwach (laut CCU)"; break;
+                case "CONFIG_PENDING":
+                    // Steht nach jeder Konfigurationsaenderung kurz an - erst
+                    // nach der eingestellten Dauer ein Wartungsfall.
+                    $seit = $this->CCUErstGesehen($a . "|" . $art);
+                    if (time() - $seit > max(1, $this->ReadPropertyInteger("ConfigPendingStunden")) * 3600) {
+                        $wartung = $wartung ?? "Konfiguration ausstehend seit " . $this->Dauer(time() - $seit) . " (laut CCU)";
+                    }
+                    break;
+                default:
+                    $wartung = $wartung ?? "CCU meldet " . $art;
             }
         }
-
-        if (GetValue($v["unreach"]) === true) return $this->Ergebnis(self::B_GESTOERT, "nicht erreichbar", $wartung);
-        if (isset($v["sabotage"]) && GetValue($v["sabotage"]) === true) return $this->Ergebnis(self::B_GESTOERT, "Sabotage gemeldet", $wartung);
+        if ($gestoert !== null) return $this->Ergebnis(self::B_GESTOERT, $gestoert, $wartung);
         return $this->Ergebnis(self::B_OK, "", $wartung);
+    }
+
+    /** Servicemeldungen einer CCU, einmal pro Pruefzyklus. null = nicht abfragbar. */
+    private function CCUServicemeldungen(int $socket): ?array {
+        if (array_key_exists($socket, $this->ccuCache)) return $this->ccuCache[$socket];
+        $ergebnis = null;
+        if ($socket > 0 && IPS_InstanceExists($socket) && function_exists("HM_ReadServiceMessages")) {
+            try {
+                $m = @HM_ReadServiceMessages($socket);
+                if (is_array($m)) $ergebnis = $m;
+            } catch (\Throwable $e) {
+                $this->SendDebug("CCU", "Servicemeldungen nicht lesbar: " . $e->getMessage(), 0);
+            }
+        }
+        $this->ccuCache[$socket] = $ergebnis;
+        return $ergebnis;
+    }
+
+    private function CCUErstGesehen(string $schluessel): int {
+        $e = json_decode($this->ReadAttributeString("CCUErstGesehen"), true);
+        if (!is_array($e)) $e = [];
+        if (!isset($e[$schluessel])) {
+            $e[$schluessel] = time();
+            $this->WriteAttributeString("CCUErstGesehen", json_encode($e));
+        }
+        $this->ccuCache["_gesehen"][$schluessel] = true;
+        return (int)$e[$schluessel];
+    }
+
+    /** Vorbei ist vorbei: Nicht mehr gemeldete Eintraege vergessen. */
+    private function CCUErstGesehenAufraeumen() {
+        $e = json_decode($this->ReadAttributeString("CCUErstGesehen"), true);
+        if (!is_array($e) || count($e) === 0) return;
+        $gesehen = $this->ccuCache["_gesehen"] ?? [];
+        $neu = array_intersect_key($e, $gesehen);
+        if (count($neu) !== count($e)) $this->WriteAttributeString("CCUErstGesehen", json_encode($neu));
     }
 
     /**
