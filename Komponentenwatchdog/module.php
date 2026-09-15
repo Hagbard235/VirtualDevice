@@ -186,35 +186,44 @@ class Komponentenwatchdog extends IPSModule {
         $prozent = max(1, $this->ReadPropertyInteger("SammelausfallProzent"));
         foreach ($abhaengige as $b => $keys) {
             if (!isset($befund[$b])) continue;
-            $gesamt = 0; $still = 0; $lebend = 0;
+            // Zaehlbasis sind nur Geraete, die bis eben lebten. Schon einzeln
+            // gemeldete oder Altbestand zaehlen nicht - sonst loeste jede
+            // Einzelmeldung gleich den naechsten Sammelausfall aus.
+            $gesamt = 0; $still = 0; $lebend = 0; $bekannt = 0;
             foreach ($keys as $key) {
                 if (!isset($befund[$key])) continue;
                 $zz = $zust[$key]["zustand"] ?? self::Z_UNBEKANNT;
-                if ($zz !== self::Z_OK && $zz !== self::Z_GESTOERT) continue;
+                if ($zz === self::Z_OK || $zz === self::Z_GESTOERT) {
+                    $bekannt++;
+                    if ($befund[$key]["status"] === self::B_OK) $lebend++;
+                }
+                if ($zz !== self::Z_OK) continue;
                 $gesamt++;
                 if ($befund[$key]["status"] === self::B_GESTOERT) $still++;
-                if ($befund[$key]["status"] === self::B_OK) $lebend++;
             }
-            $grund = "Sammelausfall: " . $still . " von " . $gesamt . " Komponenten dahinter still";
+
+            $zb = $zust[$b] ?? [];
+            $zbZustand = $zb["zustand"] ?? self::Z_UNBEKANNT;
 
             // Wegen Sammelausfall gestoert: wieder da, sobald IRGENDETWAS
             // durchkommt. Wuerde sie erst bei der Mehrheit wieder freigegeben,
             // blieben wirklich ausgefallene Geraete dahinter fuer immer
             // eingefroren und wuerden nie einzeln gemeldet.
-            $zb = $zust[$b] ?? [];
-            if (($zb["zustand"] ?? "") === self::Z_GESTOERT && !empty($zb["sammelausfall"])) {
-                if ($lebend === 0 && $gesamt > 0) {
+            if ($zbZustand === self::Z_GESTOERT && !empty($zb["sammelausfall"])) {
+                if ($lebend === 0 && $bekannt > 0) {
                     $befund[$b]["status"] = self::B_GESTOERT;
-                    $befund[$b]["grund"] = $grund;
+                    $befund[$b]["grund"] = $zb["grund"];
                 }
                 $befund[$b]["sammelausfall"] = true;
                 continue;
             }
 
-            if ($befund[$b]["status"] !== self::B_OK) continue;
+            // Erkannt wird ein Sammelausfall nur an einer laufenden Bruecke.
+            // Eine selbst gestoerte Bruecke kehrt ueber ihr eigenes Signal zurueck.
+            if ($zbZustand !== self::Z_OK || $befund[$b]["status"] !== self::B_OK) continue;
             if ($gesamt >= 3 && $still * 100 >= $gesamt * $prozent) {
                 $befund[$b]["status"] = self::B_GESTOERT;
-                $befund[$b]["grund"] = $grund;
+                $befund[$b]["grund"] = "Sammelausfall: " . $still . " von " . $gesamt . " Komponenten dahinter still";
                 $befund[$b]["sammelausfall"] = true;
             }
         }
