@@ -61,6 +61,18 @@ class Komponentenwatchdog extends IPSModule {
         $this->RegisterPropertyInteger("SammelausfallProzent", 50);
         $this->RegisterPropertyString("Tagesuebersicht", "18:00");
 
+        // Flaechendeckend je System. Kein Geraet im Haus ist ohne Funktion -
+        // das Gewicht entscheidet, wie schnell gemeldet wird, nicht ob. Was
+        // nicht in der Liste steht, laeuft als "allgemein" mit. Die Liste
+        // hebt einzelne Geraete an oder stellt sie ruhend.
+        $this->RegisterPropertyBoolean("SystemHomematic", true);
+        $this->RegisterPropertyString("HomematicBruecke", "hm_socket");
+        $this->RegisterPropertyBoolean("SystemZigbee", true);
+        $this->RegisterPropertyInteger("Zigbee2MQTTKonfigurator", 0);
+        $this->RegisterPropertyString("ZigbeeBruecke", "z2m_client");
+        $this->RegisterPropertyBoolean("SystemInstanzen", true);
+        $this->RegisterPropertyInteger("AbdeckungNeuErmittelnMinuten", 60);
+
         $this->RegisterAttributeString("Zustaende", "{}");
         $this->RegisterAttributeString("Tagesliste", "[]");
         $this->RegisterAttributeString("Protokoll", "[]");
@@ -139,7 +151,19 @@ class Komponentenwatchdog extends IPSModule {
                 : "Bei Aufnahme schon gestört: " . $n . " Komponenten (siehe Übersicht)";
         }
 
-        $this->Senden("Watchdog: Tagesübersicht", implode(". ", $teile) . ".", "normal", "tag-" . date("Y-m-d-H-i"));
+        $text = implode(". ", $teile) . ".";
+        // Mit flaechendeckender Abdeckung wird die Liste schnell laenger als
+        // eine Push fasst (256 Bytes). Dann Zahlen statt Namen - die Namen
+        // stehen in der Geraeteuebersicht.
+        if (strlen($text) > 230) {
+            $zahlen = [];
+            foreach (["gestoert" => "ausgefallen", "entwarnung" => "wieder da", "wartung" => "Wartung",
+                      "wartung_behoben" => "Wartung erledigt", "altbestand" => "schon bei Aufnahme gestört"] as $art => $wort) {
+                if (!empty($gruppen[$art])) $zahlen[] = count($gruppen[$art]) . " " . $wort;
+            }
+            $text = implode(", ", $zahlen) . ". Details in der Geräteübersicht.";
+        }
+        $this->Senden("Watchdog: Tagesübersicht", $text, "normal", "tag-" . date("Y-m-d-H-i"));
         $this->WriteAttributeString("Tagesliste", "[]");
     }
 
@@ -177,6 +201,7 @@ class Komponentenwatchdog extends IPSModule {
     private function PruefenIntern() {
         $jetzt = time();
         $liste = $this->KomponentenListe();
+        $liste = $liste + $this->AutomatischeKomponenten($liste);
         $zust = json_decode($this->ReadAttributeString("Zustaende"), true);
         if (!is_array($zust)) $zust = [];
 
@@ -668,6 +693,157 @@ class Komponentenwatchdog extends IPSModule {
     // Konfiguration
     // ==================================================================
 
+    // ==================================================================
+    // Flaechendeckende Abdeckung
+    // ==================================================================
+
+    /**
+     * Ergaenzt die gepflegte Liste um alle Geraete der Systeme. Schluessel mit
+     * Praefix (hm:, z2m:, inst:), Gewicht "allgemein". Ein Geraet, das die
+     * Liste schon abdeckt - gleich mit welchem Gewicht oder Modus -, wird
+     * nicht doppelt aufgenommen. So stellt ein Listeneintrag ein Geraet auch
+     * ruhend.
+     *
+     * Die Ermittlung liest Instanzen und die Zigbee2MQTT-Geraeteliste und
+     * wird deshalb nur alle paar Minuten erneuert, nicht in jedem Zyklus.
+     */
+    private function AutomatischeKomponenten(array $liste): array {
+        $signatur = md5($this->ReadPropertyString("Komponenten") . "|" . IPS_GetConfiguration($this->InstanceID));
+        $cache = json_decode($this->GetBuffer("Abdeckung"), true);
+        $max = max(1, $this->ReadPropertyInteger("AbdeckungNeuErmittelnMinuten")) * 60;
+        if (is_array($cache) && ($cache["signatur"] ?? "") === $signatur && time() - (int)$cache["zeit"] < $max) {
+            return $cache["liste"];
+        }
+
+        $neu = [];
+        $info = ["homematic" => 0, "zigbee" => 0, "zigbee_unangebunden" => [], "instanzen" => 0];
+
+        if ($this->ReadPropertyBoolean("SystemHomematic")) $neu += $this->AbdeckungHomematic($liste, $info);
+        if ($this->ReadPropertyBoolean("SystemZigbee")) {
+            $z = $this->AbdeckungZigbee($liste, $info);
+            if ($z === null && is_array($cache)) {
+                // Zigbee2MQTT gerade nicht abfragbar: letzten Stand behalten,
+                // sonst verschwaenden alle Zigbee-Geraete aus der Ueberwachung.
+                foreach ($cache["liste"] as $k => $e) if (strpos($k, "z2m:") === 0) $neu[$k] = $e;
+                $info["zigbee"] = $cache["info"]["zigbee"] ?? 0;
+                $info["zigbee_unangebunden"] = $cache["info"]["zigbee_unangebunden"] ?? [];
+            } elseif ($z !== null) {
+                $neu += $z;
+            }
+        }
+        if ($this->ReadPropertyBoolean("SystemInstanzen")) $neu += $this->AbdeckungInstanzen($liste, $info);
+
+        $this->SetBuffer("Abdeckung", json_encode(["zeit" => time(), "signatur" => $signatur, "liste" => $neu, "info" => $info], JSON_UNESCAPED_UNICODE));
+        return $neu;
+    }
+
+    private function AutoEintrag(string $key, string $name, string $regel, int $objekt, string $bruecke, array $liste): array {
+        return ["Key" => $key, "Name" => $name, "Regel" => $regel, "ObjektID" => $objekt, "SchwelleMinuten" => 0,
+                "Bruecke" => ($bruecke !== "" && isset($liste[$bruecke])) ? $bruecke : "",
+                "Gewicht" => "allgemein", "Modus" => "aktiv", "Aktiv" => true, "Automatisch" => true];
+    }
+
+    /** Homematic: ein Eintrag je Geraet, ueber seinen Wartungskanal (Adresse ":0"). */
+    private function AbdeckungHomematic(array $liste, array &$info): array {
+        $belegt = [];
+        foreach ($liste as $k) {
+            if ($k["Regel"] !== "homematic" || !IPS_InstanceExists($k["ObjektID"])) continue;
+            $a = (string)(json_decode(IPS_GetConfiguration($k["ObjektID"]), true)["Address"] ?? "");
+            if ($a !== "") $belegt[explode(":", $a)[0]] = true;
+        }
+        $out = [];
+        foreach (IPS_GetInstanceList() as $i) {
+            if (IPS_GetInstance($i)["ModuleInfo"]["ModuleName"] !== "HomeMatic CCU Device") continue;
+            $a = (string)(json_decode(IPS_GetConfiguration($i), true)["Address"] ?? "");
+            if (substr($a, -2) !== ":0") continue;
+            $geraet = explode(":", $a)[0];
+            if (isset($belegt[$geraet])) continue;
+            // Der Kanal heisst meist "MAINTENANCE" - der Geraetename steht am Ordner darueber.
+            $name = IPS_GetName($i);
+            $eltern = IPS_GetParent($i);
+            if ($eltern > 0 && (stripos($name, "MAINTENANCE") !== false || strpos($name, $geraet) !== false)) $name = IPS_GetName($eltern);
+            $out["hm:" . $geraet] = $this->AutoEintrag("hm:" . $geraet, $name, "homematic", $i, $this->ReadPropertyString("HomematicBruecke"), $liste);
+            $info["homematic"]++;
+        }
+        return $out;
+    }
+
+    /**
+     * Zigbee: Welche Geraete es gibt, weiss Zigbee2MQTT selbst. Das
+     * Lebenszeichen kommt aus der Symcon-Instanz - bei mehreren (neues Modul
+     * und alter Topic-Weg) aus der, die zuletzt etwas gehoert hat.
+     * null = Zigbee2MQTT nicht abfragbar.
+     */
+    private function AbdeckungZigbee(array $liste, array &$info): ?array {
+        $konf = $this->ReadPropertyInteger("Zigbee2MQTTKonfigurator");
+        if ($konf <= 0 || !IPS_InstanceExists($konf) || !function_exists("Z2M_getDevices")) return null;
+        try { $geraete = @Z2M_getDevices($konf); } catch (\Throwable $e) { $geraete = null; }
+        if (!is_array($geraete) || count($geraete) === 0) return null;
+
+        $perIEEE = []; $perName = [];
+        foreach (IPS_GetInstanceList() as $i) {
+            $m = IPS_GetInstance($i)["ModuleInfo"]["ModuleName"];
+            if ($m === "Zigbee2MQTT Device") {
+                $ieee = strtolower((string)(json_decode(IPS_GetConfiguration($i), true)["IEEE"] ?? ""));
+                if ($ieee !== "") $perIEEE[$ieee][] = $i;
+            } elseif ($m === "MQTT Client Device" && strpos(IPS_GetName($i), "zigbee2mqtt/") === 0) {
+                $rest = substr(IPS_GetName($i), 12);
+                if (strpos($rest, "/") === false) $perName[strtolower($rest)][] = $i;
+            }
+        }
+        $belegt = [];
+        foreach ($liste as $k) if ($k["Regel"] === "zigbee2mqtt") $belegt[$k["ObjektID"]] = true;
+
+        $out = [];
+        foreach ($geraete as $g) {
+            if (($g["type"] ?? "") === "Coordinator") continue;
+            $ieee = strtolower((string)($g["ieeeAddr"] ?? ""));
+            $fn = (string)($g["friendly_name"] ?? $ieee);
+            $kandidaten = array_merge($perIEEE[$ieee] ?? [], $perName[strtolower($fn)] ?? []);
+            if (count($kandidaten) === 0) { $info["zigbee_unangebunden"][] = $fn; continue; }
+            $schonDa = false;
+            foreach ($kandidaten as $c) if (isset($belegt[$c])) $schonDa = true;
+            if ($schonDa) continue;
+
+            // Die Instanz mit dem juengsten Lebenszeichen nehmen
+            $beste = $kandidaten[0]; $besteZeit = -1;
+            foreach ($kandidaten as $c) {
+                $t = $this->ZigbeeLetztesLebenszeichen($c);
+                if ($t > $besteZeit) { $besteZeit = $t; $beste = $c; }
+            }
+            $out["z2m:" . $ieee] = $this->AutoEintrag("z2m:" . $ieee, $fn, "zigbee2mqtt", $beste, $this->ReadPropertyString("ZigbeeBruecke"), $liste);
+            $info["zigbee"]++;
+        }
+        return $out;
+    }
+
+    private function ZigbeeLetztesLebenszeichen(int $instanz): int {
+        $v = $this->Kinder($instanz);
+        foreach (["last_seen", "zuletzt gesehen"] as $n) {
+            if (!isset($v[$n])) continue;
+            $w = GetValue($v[$n]);
+            $ts = is_numeric($w) ? (float)$w : strtotime((string)$w);
+            if ($ts > 100000000000) $ts /= 1000;
+            return (int)$ts;
+        }
+        return 0;
+    }
+
+    /** Integrationen: Gateways, Sockets, MQTT-Clients und -Server, Splitter. */
+    private function AbdeckungInstanzen(array $liste, array &$info): array {
+        $belegt = [];
+        foreach ($liste as $k) if ($k["Regel"] === "instanzstatus") $belegt[$k["ObjektID"]] = true;
+        $out = [];
+        foreach (IPS_GetInstanceList() as $i) {
+            $inst = IPS_GetInstance($i);
+            if (!in_array($inst["ModuleInfo"]["ModuleType"], [1, 2])) continue;   // E/A und Splitter
+            if (isset($belegt[$i])) continue;
+            $out["inst:" . $i] = $this->AutoEintrag("inst:" . $i, IPS_GetName($i), "instanzstatus", $i, "", $liste);
+            $info["instanzen"]++;
+        }
+        return $out;
+    }
+
     private function KomponentenListe(): array {
         $roh = json_decode($this->ReadPropertyString("Komponenten"), true);
         $out = [];
@@ -760,8 +936,16 @@ class Komponentenwatchdog extends IPSModule {
         };
 
         $ueberwacht = count($zust);
+        $abd = json_decode($this->GetBuffer("Abdeckung"), true);
+        $ai = is_array($abd) ? ($abd["info"] ?? []) : [];
         $h = '<div style="font:inherit;line-height:1.35">'
-           . '<div style="opacity:.6;font-size:90%">' . $ueberwacht . ' Komponenten überwacht · geprüft ' . date("H:i") . '</div>';
+           . '<div style="opacity:.6;font-size:90%">' . $ueberwacht . ' Komponenten überwacht · geprüft ' . date("H:i") . '</div>'
+           . '<div style="opacity:.5;font-size:85%">davon automatisch: Homematic ' . (int)($ai["homematic"] ?? 0)
+           . ' · Zigbee ' . (int)($ai["zigbee"] ?? 0) . ' · Integrationen ' . (int)($ai["instanzen"] ?? 0) . '</div>';
+        if (!empty($ai["zigbee_unangebunden"])) {
+            $h .= '<div style="opacity:.5;font-size:85%">Zigbee ohne Symcon-Instanz, nicht bewertbar: '
+                . htmlspecialchars(implode(", ", $ai["zigbee_unangebunden"])) . '</div>';
+        }
         if (count($gestoert) + count($wartung) + count($altbestand) + count($unbekannt) + count($bruecke) === 0) {
             $h .= '<div style="padding:10px 0;opacity:.7">Alles in Ordnung.</div>';
         }

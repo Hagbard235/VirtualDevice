@@ -49,6 +49,21 @@
     },
     {
       "type": "ExpansionPanel",
+      "caption": "Abdeckung",
+      "expanded": true,
+      "items": [
+        { "type": "Label", "caption": "Kein Geraet im Haus ist ohne Funktion. Alle Geraete der eingeschalteten Systeme werden automatisch ueberwacht, mit Gewicht allgemein (Tagesuebersicht). Ein Eintrag in der Komponentenliste fuer dasselbe Geraet hat Vorrang - so bekommt es ein hoeheres Gewicht oder wird ruhend gestellt." },
+        { "type": "CheckBox", "name": "SystemHomematic", "caption": "Homematic: alle Geraete (bewertet nach den Servicemeldungen der CCU)" },
+        { "type": "ValidationTextBox", "name": "HomematicBruecke", "caption": "Bruecke fuer Homematic (Schluessel in der Liste)" },
+        { "type": "CheckBox", "name": "SystemZigbee", "caption": "Zigbee: alle Geraete aus Zigbee2MQTT, die in Symcon angebunden sind" },
+        { "type": "SelectInstance", "name": "Zigbee2MQTTKonfigurator", "caption": "Zigbee2MQTT-Konfigurator", "width": "500px" },
+        { "type": "ValidationTextBox", "name": "ZigbeeBruecke", "caption": "Bruecke fuer Zigbee (Schluessel in der Liste)" },
+        { "type": "CheckBox", "name": "SystemInstanzen", "caption": "Integrationen: Instanzstatus aller Gateways, Sockets, MQTT-Clients und Splitter" },
+        { "type": "NumberSpinner", "name": "AbdeckungNeuErmittelnMinuten", "caption": "Geraete neu ermitteln alle (min)", "minimum": 5 }
+      ]
+    },
+    {
+      "type": "ExpansionPanel",
       "caption": "Meldungen",
       "items": [
         { "type": "Label", "caption": "Sicherheit und Funktion melden Ausfaelle sofort, Sicherheit auch Wartung. Alles andere sammelt die Tagesuebersicht. Gemeldet wird vertraulich an den Empfaenger - die gemeinsame Anzeige bleibt aussen vor." },
