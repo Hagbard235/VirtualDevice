@@ -50,10 +50,14 @@ if (count($ziele) === 0) {
 $titel = trim((string)($_IPS["Titel"] ?? ""));
 $text  = trim((string)($_IPS["Text"] ?? ""));
 if ($titel === "") $titel = trim((string)($_IPS["Ereignis"] ?? "Meldung"));
+// Symcon begrenzt Titel auf 32 und Text auf 256 BYTES, nicht Zeichen. Ein
+// Umlaut belegt in UTF-8 zwei Bytes - "Wartung: Funkausloeser Rauchmel" mit
+// echtem oe waren 33 Bytes, und WFC_PushNotification lehnte ohne Ausnahme mit
+// false ab. mb_strcut kuerzt auf Bytes, ohne ein Zeichen zu zerschneiden.
 $stempel = " (" . date("H:i") . ")";
-if (mb_strlen($text . $stempel) <= 256) $text .= $stempel;
-$titel = mb_substr($titel, 0, 32);
-$text  = mb_substr($text, 0, 256);
+if (strlen($text . $stempel) <= 256) $text .= $stempel;
+$titel = mb_strcut($titel, 0, 32, "UTF-8");
+$text  = mb_strcut($text, 0, 256, "UTF-8");
 
 $erreicht = 0;
 foreach ($ziele as $z) {
