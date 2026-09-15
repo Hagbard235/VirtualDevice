@@ -131,6 +131,23 @@ class Komponentenwatchdog extends IPSModule {
         $liste = json_decode($this->ReadAttributeString("Tagesliste"), true);
         if (!is_array($liste) || count($liste) === 0) return;
 
+        // Was am selben Tag ausfiel und zurueckkam, hebt sich auf. Eine Lampe
+        // am Wandschalter ist abends aus und morgens wieder da - das ist kein
+        // Befund. Gemeldet wird, was zum Zeitpunkt der Uebersicht noch ansteht.
+        $gegenstueck = ["gestoert" => "entwarnung", "wartung" => "wartung_behoben"];
+        $offen = [];
+        foreach ($liste as $i => $e) {
+            $art = $e["art"];
+            if (isset($gegenstueck[$art])) {
+                $offen[$e["key"] . "|" . $gegenstueck[$art]][] = $i;
+            } elseif (in_array($art, $gegenstueck, true) && !empty($offen[$e["key"] . "|" . $art])) {
+                $vorher = array_pop($offen[$e["key"] . "|" . $art]);
+                unset($liste[$vorher], $liste[$i]);
+            }
+        }
+        $liste = array_values($liste);
+        if (count($liste) === 0) { $this->WriteAttributeString("Tagesliste", "[]"); return; }
+
         $gruppen = [];
         foreach ($liste as $e) $gruppen[$e["art"]][] = $e;
 
@@ -375,14 +392,26 @@ class Komponentenwatchdog extends IPSModule {
         $wartung = $b["wartung"];
         if ($status === self::B_UNBEKANNT) $wartung = $b["grund"];
 
+        // Entprellt wie ein Ausfall: Die Keymatic meldete beim Batteriewechsel
+        // vier Minuten lang LOWBAT - das ergab eine Wartungs- und gleich darauf
+        // eine Erledigt-Meldung. Erst wenn der Wechsel mehrere Pruefungen in
+        // Folge ansteht, zaehlt er.
+        $n = max(1, $this->ReadPropertyInteger("Entprellung"));
         if ($wartung !== null && $z["wartung"] === null) {
-            $z["wartung"] = $wartung; $z["wartungSeit"] = $jetzt;
-            $z = $this->Ereignis($k, $key, "wartung", $wartung, $z, 0);
+            $z["wartungZaehler"] = (int)($z["wartungZaehler"] ?? 0) + 1;
+            if ($z["wartungZaehler"] >= $n) {
+                $z["wartung"] = $wartung; $z["wartungSeit"] = $jetzt; $z["wartungZaehler"] = 0;
+                $z = $this->Ereignis($k, $key, "wartung", $wartung, $z, 0);
+            }
         } elseif ($wartung === null && $z["wartung"] !== null) {
-            $z = $this->Ereignis($k, $key, "wartung_behoben", $z["wartung"], $z, 0);
-            $z["wartung"] = null; $z["wartungSeit"] = 0;
-        } elseif ($wartung !== null) {
-            $z["wartung"] = $wartung;
+            $z["wartungZaehler"] = (int)($z["wartungZaehler"] ?? 0) + 1;
+            if ($z["wartungZaehler"] >= $n) {
+                $z = $this->Ereignis($k, $key, "wartung_behoben", $z["wartung"], $z, 0);
+                $z["wartung"] = null; $z["wartungSeit"] = 0; $z["wartungZaehler"] = 0;
+            }
+        } else {
+            $z["wartungZaehler"] = 0;
+            if ($wartung !== null) $z["wartung"] = $wartung;
         }
         return $z;
     }
