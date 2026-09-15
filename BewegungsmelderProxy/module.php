@@ -11,12 +11,14 @@ class BewegungsmelderProxy extends IPSModule {
     // Zeitfenster, in dem nach einem Schaltbefehl auf die Rückmeldung des Geräts
     // gewartet wird. MQTT- und Eltako-Aktoren brauchen rund eine Sekunde.
     const SWITCH_TIMEOUT = 5.0;
+    const MAX_SWITCH_ATTEMPTS = 3;
+    const DISPATCH_INTERVAL = 100; // ms; keine 1-ms-Schleife bei wartendem I/O.
 
     // Deckel für den AutoCycleActive-Nachtrigger (siehe CheckLogic/IsFarTooBright):
     // "hell wegen uns" gilt nur bis zu diesem Vielfachen der Schaltschwelle. Darüber
     // ist es zu hell, um noch plausibel von der eigenen Lampe zu stammen (z.B. echtes
-    // Tageslicht bei Dauerpräsenz) - der Nachtrigger wird dann sowohl beim (Wieder-)
-    // Einschalten (CheckLogic) als auch bei der Timer-Verlängerung (TimerEvent) gesperrt.
+    // Tageslicht bei Dauerpräsenz). Gilt für CheckLogic; echte Präsenz verlängert
+    // einen bereits laufenden Nachlauf weiterhin unabhängig von der Helligkeit.
     const NACHTRIGGER_CAP_FACTOR = 1.5;
 
     public function Create() {
@@ -42,6 +44,7 @@ class BewegungsmelderProxy extends IPSModule {
 
         // 2. Attribute (Interner Speicher für den "letzten Modus")
         $this->RegisterAttributeInteger("SavedMode", self::MODE_AUTO_LUX);
+        $this->RegisterAttributeInteger("SwitchSequence", 0);
 
         // Merker, ob die Automatik im laufenden Nachlauf-Zyklus eingeschaltet hat.
         // Nur dann darf die Helligkeitsprüfung übersprungen werden (siehe CheckLogic).
@@ -76,6 +79,7 @@ class BewegungsmelderProxy extends IPSModule {
         $this->RegisterVariableBoolean("Motion", "Bewegung", "~Motion", 20);
         $this->RegisterVariableInteger("Brightness", "Helligkeit", "~Illumination", 30);
         $this->RegisterVariableInteger("ThresholdVar", "Schaltschwelle", "BWM.Lux", 35);
+        $this->RegisterVariableString("SwitchError", "Schaltfehler", "", 40);
         $this->EnableAction("ThresholdVar");
         
         $this->RegisterVariableInteger("Mode", "Modus", "BWM.Mode", 0);
@@ -88,6 +92,7 @@ class BewegungsmelderProxy extends IPSModule {
         // 6. Timer registrieren
         $this->RegisterTimer("AutoOffTimer", 0, 'BWMProxy_TimerEvent($_IPS[\'TARGET\']);');
         $this->RegisterTimer("VerifyTimer", 0, 'BWMProxy_VerifySwitch($_IPS[\'TARGET\']);');
+        $this->RegisterTimer("DispatchTimer", 0, 'BWMProxy_DispatchSwitch($_IPS[\'TARGET\']);');
     }
 
     public function ApplyChanges() {
@@ -161,41 +166,31 @@ class BewegungsmelderProxy extends IPSModule {
         if ($btnOffID > 0) $this->RegisterMessage($btnOffID, VM_UPDATE);
         if ($btnAutoID > 0) $this->RegisterMessage($btnAutoID, VM_UPDATE);
 
-        // Status aus dem tatsächlichen Gerätezustand synchronisieren.
-        // Nach einem IPS-Neustart stellt Symcon den zuletzt gespeicherten Wert wieder her,
-        // der nicht zwingend zum echten Licht passt. Ein stehengebliebenes "AN" würde in
-        // CheckLogic die Helligkeitsprüfung überbrücken.
-        $actualState = false;
-        if ($lightID > 0 && IPS_VariableExists($lightID)) {
-            $actualState = GetValueBoolean($lightID);
-            if ($this->GetValue("Status") !== $actualState) {
-                $this->SendDebug("ApplyChanges", "Status war desynchron. Korrigiert auf " . ($actualState ? "TRUE" : "FALSE"), 0);
-            }
+        $this->WithStateLock(function () use ($lightID) {
+            $actualState = $lightID > 0 && IPS_VariableExists($lightID)
+                ? GetValueBoolean($lightID) : false;
             $this->SetValue("Status", $actualState);
-        }
-        $this->WriteAttributeBoolean("AutoCycleActive", false);
-        $this->SetBuffer("PendingSwitch", "");
-        $this->SetTimerInterval("VerifyTimer", 0);
-
-        // Sicherheitsnetz: Licht ist an, aber kein Zyklus/Timer bekannt (z.B. nach einem
-        // Instanz- oder Kernel-Neustart, während das Licht brannte - RegisterTimer setzt
-        // dann wieder auf 0). Ohne diesen Reset kommt so lange kein neuer Nachlauf-Zyklus
-        // mehr zustande, bis irgendwann ein Trigger die Bedingungen von CheckLogic erfüllt -
-        // im Extremfall nie. Wir behandeln ein unerklärt brennendes Licht daher wie ein
-        // frisches manuelles Einschalten: voller Timer, Zyklus als aktiv markiert.
-        $mode = $this->GetValue("Mode");
-        if ($actualState && ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX)) {
-            $duration = $this->ReadPropertyInteger("Duration") * 1000;
-            $this->SendDebug("ApplyChanges", "Licht war unerwartet an, kein Zyklus aktiv. Starte Sicherheits-Timer: " . ($duration / 1000) . "s", 0);
-            $this->WriteAttributeBoolean("AutoCycleActive", true);
-            $this->SetTimerInterval("AutoOffTimer", $duration);
-        }
+            $this->SyncMotion();
+            $this->WriteAttributeBoolean("AutoCycleActive", false);
+            $this->ClearPendingSwitch();
+            $this->StopAutoOff();
+            if ($actualState && $this->IsAutomatic()) {
+                $this->StartAutoOff();
+            }
+        });
 
         // Helper Scripte (An/Aus) anlegen oder aktualisieren
         $this->CreateHelperScripts();
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data) {
+        if ($Message != VM_UPDATE || !isset($Data[0])) return;
+        $this->WithStateLock(function () use ($TimeStamp, $SenderID, $Message, $Data) {
+            $this->HandleMessage($TimeStamp, $SenderID, $Message, $Data);
+        });
+    }
+
+    private function HandleMessage($TimeStamp, $SenderID, $Message, $Data) {
         
         $motionSensors = json_decode($this->ReadPropertyString("MotionSensors"), true);
         $lightID = $this->ReadPropertyInteger("TargetLightID");
@@ -295,25 +290,24 @@ class BewegungsmelderProxy extends IPSModule {
                 $this->CheckLogic($linkedMotionID);
             }
         } elseif ($SenderID == $lightID) {
-            // Die Rückmeldung des Geräts ist die verbindliche Quelle für "Status".
-            // Solange die Schaltverzögerung läuft, akzeptieren wir aber nur die
-            // Bestätigung des gewünschten Zustands - ein widersprechendes Echo ist in
-            // diesem Fenster veraltet (z.B. retained MQTT-Topic) und würde Status
-            // fälschlich zurückwerfen.
-            // Der Merker liegt im Buffer, da Instanz-Properties zwischen zwei
-            // MessageSink-Aufrufen nicht erhalten bleiben.
-            $pending = json_decode($this->GetBuffer("PendingSwitch"), true);
-            $isPending = is_array($pending) && (microtime(true) - $pending['ts']) < self::SWITCH_TIMEOUT;
-
-            if ($isPending && $value !== $pending['state']) {
-                $this->SendDebug("MessageSink", "Veraltetes Echo von Licht $lightID verworfen (erwartet: " . ($pending['state'] ? "TRUE" : "FALSE") . ", erhalten: " . ($value ? "TRUE" : "FALSE") . ")", 0);
-            } else {
-                if ($isPending) {
-                    $this->SendDebug("MessageSink", "Schaltvorgang von Gerät $lightID bestätigt: " . ($value ? "TRUE" : "FALSE"), 0);
-                    $this->SetBuffer("PendingSwitch", "");
-                    $this->SetTimerInterval("VerifyTimer", 0); // Nachkontrolle nicht mehr nötig
+            // Aktuellen Variablenwert lesen: eine verzögert abgearbeitete Nachricht
+            // darf einen neueren Gerätezustand nicht durch ihren alten Payload ersetzen.
+            $actual = GetValueBoolean($lightID);
+            $pending = $this->PendingSwitch();
+            if ($pending !== null) {
+                // Erst nach abgeschlossenem Sendeaufruf quittieren. Sonst könnte ein
+                // altes Echo einen noch wartenden Gegenbefehl vorzeitig löschen.
+                if ($pending['phase'] === 'sent' && $actual === $pending['state']) {
+                    $this->ClearPendingSwitch();
+                    $this->SetValue("SwitchError", "");
+                    $this->SetValue("Status", $actual);
                 }
-                $this->SetValue("Status", $value);
+            } else {
+                $this->SetValue("Status", $actual);
+                if ($actual && $this->IsAutomatic() && $this->AutoOffDeadline() <= 0) {
+                    // Auch direkt am Aktor eingeschaltetes Licht bekommt einen Nachlauf.
+                    $this->StartAutoOff();
+                }
             }
         } elseif ($SenderID == $luxID || $SenderID == $extDarkID || $isLocalBrightnessSender) {
              if ($SenderID == $luxID) {
@@ -323,7 +317,7 @@ class BewegungsmelderProxy extends IPSModule {
              // Race Condition Fix:
              // Falls Hardware erst Bewegung meldet (noch zu hell) und millisekunden später den neuen Helligkeitswert,
              // müssen wir hier nach-prüfen, sofern Bewegung noch aktiv ist.
-             if ($this->GetValue("Motion")) {
+             if ($this->SyncMotion()) {
                  $this->SendDebug("Logic", "Brightness/Darkness update while Motion is active -> Re-evaluating Logic", 0);
                  $recheckID = $isLocalBrightnessSender ? $linkedMotionID : 0;
                  $this->CheckLogic($recheckID);
@@ -332,23 +326,29 @@ class BewegungsmelderProxy extends IPSModule {
     }
 
     public function RequestAction($Ident, $Value) {
+        $this->WithStateLock(function () use ($Ident, $Value) {
+            $this->HandleAction($Ident, $Value);
+        });
+    }
+
+    private function HandleAction($Ident, $Value) {
         switch ($Ident) {
             case "Status":
-                // Manuelles Schalten der Status-Variable
+                $Value = (bool)$Value;
+                // Eine explizite Ein-/Aus-Bedienung verlässt einen widersprechenden
+                // Dauer-Modus. Sonst bliebe z.B. manuell EIN in "Dauer Aus" ohne Ende.
+                $mode = $this->GetValue("Mode");
+                if (($Value && $mode == self::MODE_ALWAYS_OFF) ||
+                    (!$Value && $mode == self::MODE_ALWAYS_ON)) {
+                    $saved = $this->ReadAttributeInteger("SavedMode");
+                    $this->SetValue("Mode", in_array($saved, [self::MODE_AUTO_LUX, self::MODE_AUTO_NOLUX], true)
+                        ? $saved : self::MODE_AUTO_LUX);
+                }
                 $this->SwitchLight($Value);
-                if ($Value) {
-                    // Manuell AN -> Timer starten (simuliert Bewegung)
-                    // Zyklus als aktiv markieren, damit Bewegung den Nachlauf verlängern
-                    // kann, ohne an der Helligkeitsprüfung zu scheitern.
-                    $duration = $this->ReadPropertyInteger("Duration") * 1000;
-                    $this->SendDebug("Manual", "Switched ON manually. Starting Timer: " . ($duration/1000) . "s", 0);
-                    $this->WriteAttributeBoolean("AutoCycleActive", true);
-                    $this->SetTimerInterval("AutoOffTimer", $duration);
+                if ($Value && $this->IsAutomatic()) {
+                    $this->StartAutoOff();
                 } else {
-                    // Manuell AUS -> Timer stoppen
-                    $this->SendDebug("Manual", "Switched OFF manually. Stopping Timer.", 0);
-                    $this->WriteAttributeBoolean("AutoCycleActive", false);
-                    $this->SetTimerInterval("AutoOffTimer", 0);
+                    $this->StopAutoOff();
                 }
                 break;
             case "Mode":
@@ -369,33 +369,35 @@ class BewegungsmelderProxy extends IPSModule {
      * Befehl: BWMProxy_SetLight(InstanceID, true|false);
      */
     public function SetLight(bool $State) {
-        $this->SwitchLight($State);
+        $this->RequestAction('Status', $State);
     }
 
     private function ChangeMode($newMode) {
-        $this->SendDebug("Mode", "Changing Mode to: " . $newMode, 0);
+        if (!in_array($newMode, [0, 1, 2, 3], true)) {
+            throw new InvalidArgumentException("Ungültiger Bewegungsmelder-Modus");
+        }
         $this->SetValue("Mode", $newMode);
-
-        // Moduswechsel beendet den laufenden Automatik-Zyklus. CheckLogic weiter unten
-        // setzt das Flag bei Bedarf neu.
-        $this->WriteAttributeBoolean("AutoCycleActive", false);
-
-        // Sofortige Reaktion auf Moduswechsel
+        if ($this->IsAutomatic()) $this->WriteAttributeInteger("SavedMode", $newMode);
+        $this->StopAutoOff();
+        $motion = $this->SyncMotion();
         if ($newMode == self::MODE_ALWAYS_ON) {
             $this->SwitchLight(true);
-            $this->SetTimerInterval("AutoOffTimer", 0); // Timer aus
-            
         } elseif ($newMode == self::MODE_ALWAYS_OFF) {
             $this->SwitchLight(false);
-            $this->SetTimerInterval("AutoOffTimer", 0);
-            
-        } elseif ($newMode == self::MODE_AUTO_LUX || $newMode == self::MODE_AUTO_NOLUX) {
-            // Beim Wechsel zurück auf Automatik prüfen wir die aktuelle Lage.
-            // Wenn keine Bewegung mehr da ist -> Aus.
-            if (!$this->GetValue("Motion")) {
-                 $this->SwitchLight(false);
+        } elseif (!$motion) {
+            $this->SwitchLight(false, true);
+        } else {
+            $target = $this->ReadPropertyInteger("TargetLightID");
+            $pending = $this->PendingSwitch();
+            if ($this->GetValue("Status") ||
+                ($target > 0 && IPS_VariableExists($target) && GetValueBoolean($target)) ||
+                ($pending !== null && $pending['state'])) {
+                // Eintritt in Auto: ein brennendes Licht braucht auch bei Helligkeit
+                // einen definierten Nachlauf und ggf. einen Gegenbefehl zu altem AUS.
+                $this->SwitchLight(true);
+                $this->StartAutoOff();
             } else {
-                 $this->CheckLogic();
+                $this->CheckLogic();
             }
         }
     }
@@ -435,10 +437,7 @@ class BewegungsmelderProxy extends IPSModule {
 
         if ($shouldSwitch) {
             $this->SwitchLight(true);
-            $this->WriteAttributeBoolean("AutoCycleActive", true);
-            $duration = $this->ReadPropertyInteger("Duration") * 1000;
-            $this->SendDebug("Logic", "Switching ON (or extending). Timer set to " . ($duration/1000) . "s", 0);
-            $this->SetTimerInterval("AutoOffTimer", $duration);
+            $this->StartAutoOff();
         } else {
             $this->SendDebug("CheckLogic", "Conditions not met. No switch/extension.", 0);
         }
@@ -559,99 +558,192 @@ class BewegungsmelderProxy extends IPSModule {
         return false;
     }
 
-    private function SwitchLight($state) {
-        $targetID = $this->ReadPropertyInteger("TargetLightID");
-        if ($targetID > 0 && IPS_VariableExists($targetID)) {
-            // Traffic-Optimierung: Nur schalten, wenn Zustand abweicht
-            $currentState = GetValueBoolean($targetID);
-
-            if ($currentState !== $state) {
-                $this->SendDebug("SwitchLight", "Setting Device $targetID to " . ($state ? "TRUE" : "FALSE"), 0);
-
-                // Gewünschten Zustand samt Zeitpunkt hinterlegen. Solange die
-                // Schaltverzögerung läuft, dient das dem MessageSink zur Unterscheidung
-                // von Bestätigung und veraltetem Echo.
-                $this->SetBuffer("PendingSwitch", json_encode(['state' => $state, 'ts' => microtime(true)]));
-
-                // Nachkontrolle anstoßen, falls die Rückmeldung ausbleibt.
-                $this->SetTimerInterval("VerifyTimer", (int)(self::SWITCH_TIMEOUT * 1000));
-
-                @RequestAction($targetID, $state);
-            } else {
-                //$this->SendDebug("SwitchLight", "Device $targetID is already " . ($state ? "TRUE" : "FALSE") . ". Skipping.", 0);
-            }
-
-            // Status vorläufig auf den Wunschzustand setzen. Zurücklesen bringt hier nichts:
-            // das Gerät (MQTT/Eltako) braucht bis zu einer Sekunde. Die verbindliche
-            // Korrektur kommt aus der Rückmeldung im MessageSink.
-            $this->SetValue("Status", $state);
-        } else {
-            $this->SendDebug("SwitchLight", "No TargetLightID configured or variable does not exist. Cannot switch light.", 0);
+    // Alle Zustandsentscheidungen laufen unter derselben kurzen Sperre. Keine
+    // Geräteaufrufe darunter: deren synchrone Rückmeldungen nutzen MessageSink.
+    private function WithStateLock(callable $work) {
+        $key = 'BWMProxy.State.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($key, 5000)) {
+            throw new RuntimeException("BewegungsmelderProxy: Zustandssperre belegt");
         }
+        try { return $work(); } finally { IPS_SemaphoreLeave($key); }
     }
 
-    public function TimerEvent() {
-        $this->SendDebug("Timer", "AutoOffTimer Expired", 0);
+    protected function Now() { return microtime(true); }
 
-        // Safety Check: Ist noch Bewegung da?
-        // Wenn der Sensor noch "True" meldet (Dauerpräsenz), darf das Licht nicht ausgehen -
-        // bewusst UNABHAENGIG von der Helligkeit. Der Deckel (IsFarTooBright, siehe
-        // CheckLogic) betrifft nur die Entscheidung, ob aus dem Aus-Zustand heraus wieder
-        // eingeschaltet werden darf - ein laufender Zyklus mit echter Dauerpräsenz soll
-        // dadurch nicht abgewürgt werden.
-        if ($this->GetValue("Motion")) {
-             $duration = $this->ReadPropertyInteger("Duration") * 1000;
-             $this->SendDebug("Timer", "Motion still active! Extending timer by " . ($duration/1000) . "s", 0);
-             $this->SetTimerInterval("AutoOffTimer", $duration);
-             return;
-        }
+    private function IsAutomatic() {
+        return in_array($this->GetValue("Mode"), [self::MODE_AUTO_LUX, self::MODE_AUTO_NOLUX], true);
+    }
 
-        $mode = $this->GetValue("Mode");
-        // Nur ausschalten, wenn wir im Auto-Modus sind
-        if ($mode == self::MODE_AUTO_LUX || $mode == self::MODE_AUTO_NOLUX) {
-            $this->SwitchLight(false);
-        }
-        // Zyklus ist beendet - der nächste Trigger muss die Helligkeit wieder prüfen.
-        // Auch in den Dauer-Modi zurücksetzen, damit kein Flag stehenbleibt.
+    private function SyncMotion() {
+        $motion = $this->GetMotionState();
+        $this->SetValue("Motion", $motion);
+        return $motion;
+    }
+
+    private function AutoOffDeadline() {
+        return (float)$this->GetBuffer("AutoOffDeadline");
+    }
+
+    private function StartAutoOff() {
+        // 0 darf keinen eingeschalteten Automatik-Zyklus ohne Timer erzeugen.
+        $seconds = max(1, $this->ReadPropertyInteger("Duration"));
+        $this->WriteAttributeBoolean("AutoCycleActive", true);
+        $this->SetBuffer("AutoOffDeadline", (string)($this->Now() + $seconds));
+        $this->SetTimerInterval("AutoOffTimer", $seconds * 1000);
+    }
+
+    private function StopAutoOff() {
         $this->WriteAttributeBoolean("AutoCycleActive", false);
+        $this->SetBuffer("AutoOffDeadline", "");
         $this->SetTimerInterval("AutoOffTimer", 0);
     }
 
-    /**
-     * Nachkontrolle nach einem Schaltbefehl.
-     * Läuft nur an, wenn innerhalb von SWITCH_TIMEOUT keine Rückmeldung kam.
-     */
-    public function VerifySwitch() {
-        $this->SetTimerInterval("VerifyTimer", 0);
-
+    private function PendingSwitch() {
         $pending = json_decode($this->GetBuffer("PendingSwitch"), true);
-        if (!is_array($pending)) {
-            // Rückmeldung war schon da und wurde im MessageSink verarbeitet.
+        return is_array($pending) ? $pending : null;
+    }
+
+    private function ClearPendingSwitch() {
+        $this->SetBuffer("PendingSwitch", "");
+        $this->SetTimerInterval("VerifyTimer", 0);
+        $this->SetTimerInterval("DispatchTimer", 0);
+    }
+
+    private function SwitchLight($state, $automaticOff = false) {
+        $state = (bool)$state;
+        $target = $this->ReadPropertyInteger("TargetLightID");
+        if ($target <= 0 || !IPS_VariableExists($target)) {
+            $this->ClearPendingSwitch();
+            $this->SetValue("SwitchError", "Zielvariable fehlt: " . $target);
             return;
         }
-        $this->SetBuffer("PendingSwitch", "");
-
-        $targetID = $this->ReadPropertyInteger("TargetLightID");
-        if ($targetID <= 0 || !IPS_VariableExists($targetID)) return;
-
-        $wanted = $pending['state'];
-        $actualState = GetValueBoolean($targetID);
-
-        if ($actualState === $wanted) {
-            // Gerät hat geschaltet, nur ohne dass uns eine Meldung erreicht hat.
-            $this->SendDebug("Verify", "Gerät $targetID steht auf " . ($actualState ? "TRUE" : "FALSE") . " - Rückmeldung blieb aus, Zustand stimmt.", 0);
+        $pending = $this->PendingSwitch();
+        if ($pending !== null && $pending['state'] === $state && $pending['target'] === $target) {
+            // Bewegung darf eine ausstehende Quittierung nicht immer neu terminieren.
+            // Explizites AUS ist stärker als ein automatischer Ausschaltversuch.
+            $pending['automaticOff'] = $pending['automaticOff'] && $automaticOff;
+            $this->SetBuffer("PendingSwitch", json_encode($pending));
+        } elseif ($pending !== null || GetValueBoolean($target) !== $state) {
+            $sequence = $this->ReadAttributeInteger("SwitchSequence") + 1;
+            $this->WriteAttributeInteger("SwitchSequence", $sequence);
+            $this->SetBuffer("PendingSwitch", json_encode([
+                'id' => $sequence, 'target' => $target, 'state' => $state,
+                'automaticOff' => $automaticOff, 'attempts' => 0,
+                'phase' => 'queued', 'ts' => $this->Now()
+            ]));
+            $this->SetTimerInterval("VerifyTimer", 0);
+            $this->SetTimerInterval("DispatchTimer", self::DISPATCH_INTERVAL);
         } else {
-            $this->SendDebug("Verify", "WARNUNG: Gerät $targetID hat den Schaltbefehl nicht übernommen. Gewollt: " . ($wanted ? "TRUE" : "FALSE") . ", tatsächlich: " . ($actualState ? "TRUE" : "FALSE"), 0);
-
-            // Wenn das Einschalten fehlschlug, darf kein Automatik-Zyklus laufen -
-            // sonst würde die Helligkeitsprüfung beim nächsten Trigger übersprungen,
-            // obwohl gar kein Licht brennt.
-            if ($wanted === true) {
-                $this->WriteAttributeBoolean("AutoCycleActive", false);
-            }
+            $this->SetValue("SwitchError", "");
         }
+        $this->SetValue("Status", $state);
+    }
 
-        $this->SetValue("Status", $actualState);
+    // Eigener Worker: serialisierte Gerätebefehle, aber kein State-Lock während I/O.
+    public function DispatchSwitch() {
+        $ioKey = 'BWMProxy.IO.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($ioKey, 0)) return;
+        try {
+            $command = $this->WithStateLock(function () {
+                $pending = $this->PendingSwitch();
+                if ($pending === null || $pending['phase'] !== 'queued') {
+                    $this->SetTimerInterval("DispatchTimer", 0);
+                    return null;
+                }
+                if ($pending['automaticOff'] && $this->IsAutomatic() && $this->SyncMotion()) {
+                    $this->SwitchLight(true);
+                    $this->StartAutoOff();
+                    return null;
+                }
+                $pending['phase'] = 'sending';
+                $pending['attempts']++;
+                $this->SetBuffer("PendingSwitch", json_encode($pending));
+                // Falls ein neuer Wunsch während I/O eintrifft, bleibt dessen Timer
+                // aktiv. Ein wiederholter Worker darf ihn nicht abschalten.
+                $this->SetTimerInterval("DispatchTimer", 0);
+                return $pending;
+            });
+            if ($command === null) return;
+            $failure = null;
+            try {
+                if (!IPS_VariableExists($command['target'])) {
+                    throw new RuntimeException("Zielvariable wurde entfernt");
+                }
+                $result = RequestAction($command['target'], $command['state']);
+                if ($result === false) $failure = "RequestAction meldet Fehler";
+            } catch (Throwable $e) { $failure = $e->getMessage(); }
+            $this->WithStateLock(function () use ($command, $failure) {
+                $pending = $this->PendingSwitch();
+                // Ein inzwischen neuer Befehl gehört nicht mehr zu diesem Worker.
+                if ($pending === null || $pending['id'] !== $command['id']) return;
+                $pending['phase'] = 'sent';
+                $pending['ts'] = $this->Now();
+                $this->SetBuffer("PendingSwitch", json_encode($pending));
+                $this->SetTimerInterval("VerifyTimer", (int)(self::SWITCH_TIMEOUT * 1000));
+                if ($failure !== null) $this->SetValue("SwitchError", $failure);
+            });
+        } finally { IPS_SemaphoreLeave($ioKey); }
+    }
+
+    public function TimerEvent() {
+        $this->WithStateLock(function () {
+            if (!$this->IsAutomatic()) { $this->StopAutoOff(); return; }
+            $deadline = $this->AutoOffDeadline();
+            if ($deadline <= 0) return; // Bereits beendeter/abgebrochener Zyklus.
+            $remaining = $deadline - $this->Now();
+            if ($remaining > 0) {
+                // Ein bereits eingeplanter alter Callback darf keinen neueren
+                // Nachlauf vorzeitig beenden.
+                $this->SetTimerInterval("AutoOffTimer", max(1, (int)ceil($remaining * 1000)));
+                return;
+            }
+            if ($this->SyncMotion()) { $this->StartAutoOff(); return; }
+            // Aufräumen erfolgt vor dem asynchronen Ausschalten und unter Sperre.
+            $this->StopAutoOff();
+            $this->SwitchLight(false, true);
+        });
+    }
+
+    public function VerifySwitch() {
+        $this->WithStateLock(function () {
+            $pending = $this->PendingSwitch();
+            if ($pending === null || $pending['phase'] !== 'sent') return;
+            $remaining = self::SWITCH_TIMEOUT - ($this->Now() - $pending['ts']);
+            if ($remaining > 0) {
+                $this->SetTimerInterval("VerifyTimer", max(1, (int)ceil($remaining * 1000)));
+                return;
+            }
+            $target = $pending['target'];
+            if (!IPS_VariableExists($target)) {
+                $this->ClearPendingSwitch();
+                $this->SetValue("SwitchError", "Zielvariable fehlt: " . $target);
+                return;
+            }
+            $actual = GetValueBoolean($target);
+            $this->SetValue("Status", $actual);
+            if ($actual === $pending['state']) {
+                $this->ClearPendingSwitch();
+                $this->SetValue("SwitchError", "");
+                return;
+            }
+            if ($pending['automaticOff'] && $this->IsAutomatic() && $this->SyncMotion()) {
+                $this->SwitchLight(true);
+                $this->StartAutoOff();
+                return;
+            }
+            if ($pending['attempts'] < self::MAX_SWITCH_ATTEMPTS) {
+                $pending['phase'] = 'queued';
+                $this->SetBuffer("PendingSwitch", json_encode($pending));
+                $this->SetTimerInterval("VerifyTimer", 0);
+                $this->SetTimerInterval("DispatchTimer", self::DISPATCH_INTERVAL);
+            } else {
+                $this->ClearPendingSwitch();
+                $this->SetValue("SwitchError", "Licht " . $target . ": " .
+                    ($pending['state'] ? "EIN" : "AUS") . " nach " .
+                    self::MAX_SWITCH_ATTEMPTS . " Versuchen nicht bestätigt");
+                if ($pending['state']) $this->StopAutoOff();
+            }
+        });
     }
 
     private function GetMotionState() {

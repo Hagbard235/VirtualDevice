@@ -101,7 +101,7 @@
       "name": "Duration",
       "caption": "Einschaltdauer",
       "suffix": "Sekunden",
-      "minimum": 0
+      "minimum": 1
     }
   ]
 }

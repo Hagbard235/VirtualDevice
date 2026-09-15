@@ -1,12 +1,12 @@
 {
-	"id": "{761b0dda-db74-4ae7-924b-27c2a41351cf}",
-	"author": "Ultimate Software",
-	"name": "Virtuelle Geraete",
-	"url": "www.ultimatesoftware.de",
-	"compatibility": {
-		"version": "4.2"
-	},
-	"version": "1.0",
-	"build": 0,
-	"date": 0
+  "id": "{761b0dda-db74-4ae7-924b-27c2a41351cf}",
+  "author": "Ultimate Software",
+  "name": "Virtuelle Geraete",
+  "url": "www.ultimatesoftware.de",
+  "compatibility": {
+    "version": "4.2"
+  },
+  "version": "1.1",
+  "build": 1,
+  "date": 1789487440
 }
