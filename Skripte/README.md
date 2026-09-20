@@ -7,7 +7,7 @@ selbst **keine Module** sind. Symcon lädt aus diesem Ordner nichts — er hat k
 **Maßgeblich ist das Skript in Symcon.** Dieser Ordner ist die versionierte
 Sicherung. Wer ein Skript in Symcon ändert, zieht die Datei hier nach.
 
-Stand: 14.09.2026
+Stand: 20.09.2026
 
 ## Übersicht
 
@@ -16,6 +16,7 @@ Stand: 14.09.2026
 | `57703_Uebergabe_ToDoZentrale_an_Meldungszentrale.php` | 57703 | Ansage Ultimate Voice (ToDo-Zentrale) | Unsortiert \ VoiceAgent |
 | `15190_Meldungszentrale_Sprachkanal.php` | 15190 | MZ Sprachkanal (alle Raeume) | Hilfsscripte \ ToDoListe |
 | `25621_Meldungszentrale_Pushkanal.php` | 25621 | MZ Push-Kanal | Hilfsscripte \ ToDoListe |
+| `54194_Durchsage_alle_Echos.php` | 54194 | Durchsage auf allen Echos | Unsortiert \ VoiceAgent |
 
 ## 57703 — Übergabe ToDo-Zentrale an Meldungszentrale
 
@@ -53,6 +54,27 @@ Kachel-Visualisierungen.
 | `Sprungziel_push_vivien` | Integer | `0` |
 | `Ziele_push_alle` | String | `38777,49268` |
 | `Sprungziel_push_alle` | Integer | `0` |
+
+## 54194 — Durchsage auf allen Echos
+
+Spricht eine Ultimate-Voice-Ansage auf allen Echo-Geräten. Zum Ausführen von Hand
+im Objektbaum oder aus einem anderen Skript heraus:
+
+```php
+IPS_RunScriptEx(54194, ["Ereignis" => "fruehstueck"]);
+```
+
+Ohne Parameter sagt es „Frühstück ist fertig". Der Parameter `Raum` ist optional
+und färbt nur die Formulierung. Ultimate Voice kennt nur vorbereitete Ereignisse,
+keinen Freitext — welche es gibt, steht in der Instanzkonfiguration von 59348.
+
+Dieses Skript fragt weder Ruhezeit noch Anwesenheit ab und spricht überall. Für
+Meldungen mit Regeln ist die Meldungszentrale zuständig, nicht dieser Weg.
+
+Die Echo-Liste steht im Skript. Nicht darin stehen mit Absicht die Gruppen 15810
+und 34601 (sonst sprechen Geräte doppelt) sowie 54495 TestAlt1.
+
+Variablen unter dem Skript: _keine_
 
 ## Wiederherstellen
 
