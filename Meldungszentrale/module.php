@@ -995,7 +995,16 @@ class Meldungszentrale extends IPSModule {
         $verwaist = [];
         foreach ($index as $id => $e) {
             if (!is_file($this->MeldungPfad((string)$id))) { $verwaist[] = $id; continue; }
-            $anzahl++;
+
+            // Gezaehlt wird, was die gemeinsame Anzeige auch zeigt. Eine
+            // vertrauliche Meldung bleibt dort aussen vor (5.3) - stuende sie
+            // im Zaehler, verriete die Zahl ihre Existenz, und die Kachel
+            // widerspraeche sich selbst: "1" ueber "Keine offenen Meldungen".
+            // Ihren Empfaenger erreicht sie ueber seine eigene Sicht und Push.
+            if (empty($e["vertraulich"])) $anzahl++;
+
+            // Die Faelligkeit dagegen gilt fuer ALLE Meldungen: Auch eine
+            // vertrauliche muss punktgenau ablaufen.
             $kandidat = (int)$e["gueltigBis"];
             if ($naechster === 0 || $kandidat < $naechster) $naechster = $kandidat;
         }

@@ -44,3 +44,14 @@ Trockner läuft. Die Meldungszentrale zählt nur mit (`erinnerungen`,
 Ohne diese Trennung entstand für jede Erinnerung eine eigene Meldung: Am
 20.09.2026 standen zwölf Einträge „Waschmaschine ausräumen" nebeneinander, jeder
 mit 24 Stunden Gültigkeit, während die Wäsche längst draußen war.
+
+### Was der Zähler zählt
+
+Die Variable „Offene Meldungen" zählt genau das, was die gemeinsame Anzeige auch
+zeigt: die **nicht vertraulichen** Meldungen. Zählte sie alle mit, verriete die
+Zahl die Existenz einer vertraulichen Meldung, und die Kachel widerspräche sich
+selbst — „1" über „Keine offenen Meldungen". Wer eine vertrauliche Meldung
+bekommt, sieht sie in seiner eigenen Visualisierung und als Push.
+
+Die Fälligkeitsberechnung umfasst weiterhin **alle** Meldungen, auch die
+vertraulichen — sonst liefe eine davon über ihre Gültigkeit hinaus.
