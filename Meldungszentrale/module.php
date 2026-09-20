@@ -268,6 +268,13 @@ class Meldungszentrale extends IPSModule {
         $anAlle = (bool)($opt["anAlle"] ?? false);
         $finger = $this->Fingerabdruck($quelle, $ereignis, $titel, $text, $dring, $vertraulich, $zonen, $empf, $aktionen);
         $dedupKey = trim((string)($opt["dedupKey"] ?? ""));
+        // Stabile Kennung der SACHE, um die es geht - nicht zu verwechseln mit
+        // dem dedupKey, der nur einen wiederholten Zustellversuch desselben
+        // Ereignisses abfaengt. Ueber die Sache findet eine Quelle ihre eigene
+        // Meldung spaeter wieder: um zu erinnern (Erinnern) oder um sie beim
+        // Erledigen zurueckzuziehen (Erledigt). Eine Erinnerung ist damit keine
+        // zweite Meldung mehr, sondern dieselbe, ein zweites Mal zugestellt.
+        $sache = trim((string)($opt["sache"] ?? ""));
 
         // --- 5. DEDUP vor Flutschutz --------------------------------------
         // Ein Wiederholversuch nach verlorenem Rueckgabewert loest das
@@ -286,19 +293,19 @@ class Meldungszentrale extends IPSModule {
                     return ["ok" => false, "fehlercode" => "dedup_konflikt", "meldungID" => $vorhanden["meldungID"]];
                 }
                 return $this->Anlegen($q, $quelle, $ereignis, $titel, $text, $dring, $vertraulich,
-                                      $zonen, $empf, $aktionen, $sek, $dedupKey, $finger, $warnungen, $anAlle);
+                                      $zonen, $empf, $aktionen, $sek, $dedupKey, $finger, $warnungen, $anAlle, $sache);
             } finally {
                 IPS_SemaphoreLeave($lock);
             }
         }
         return $this->Anlegen($q, $quelle, $ereignis, $titel, $text, $dring, $vertraulich,
-                              $zonen, $empf, $aktionen, $sek, "", $finger, $warnungen, $anAlle);
+                              $zonen, $empf, $aktionen, $sek, "", $finger, $warnungen, $anAlle, $sache);
     }
 
     private function Anlegen(array $q, string $quelle, string $ereignis, string $titel, string $text,
                              string $dring, bool $vertraulich, array $zonen, array $empf,
                              array $aktionen, int $sek, string $dedupKey, string $finger,
-                             array $warnungen, bool $anAlle = false): array {
+                             array $warnungen, bool $anAlle = false, string $sache = ""): array {
 
         // --- 6. Flutschutz ------------------------------------------------
         // Der RateKey wird SERVERSEITIG gebildet. Ein im Aufruf mitgesandter
@@ -343,6 +350,9 @@ class Meldungszentrale extends IPSModule {
             "revision"      => 1,
             "quelle"        => $quelle,
             "dedupKey"      => $dedupKey,
+            "sache"         => $sache,
+            "erinnerungen"  => 0,
+            "letzteErinnerung" => 0,
             "fingerabdruck" => $finger,
             "ereignis"      => $ereignis,
             "titel"         => $titel,
@@ -398,7 +408,13 @@ class Meldungszentrale extends IPSModule {
     // Routing
     // ==================================================================
 
-    private function Routen(string $meldungID) {
+    /**
+     * @param bool $nurFluechtig Nur Kanaele bedienen, die die Meldung fluechtig
+     *                           ausgeben - Sprache, Push. Gedacht fuer eine
+     *                           Erinnerung: Die Anzeige fuehrt die Meldung
+     *                           bereits, sie braucht keinen zweiten Eintrag.
+     */
+    private function Routen(string $meldungID, bool $nurFluechtig = false) {
         $m = $this->MeldungLesen($meldungID);
         if ($m === null) return;
 
@@ -407,6 +423,11 @@ class Meldungszentrale extends IPSModule {
         $abgelehnt = [];
 
         foreach ($kandidaten as $k) {
+            // Still uebersprungen, nicht journalisiert: Dass ein persistenter
+            // Kanal bei einer Erinnerung aussen vor bleibt, ist der Zweck der
+            // Uebung und kein Befund.
+            if ($nurFluechtig && strtolower((string)($k["Lebensdauer"] ?? "")) !== "fluechtig") continue;
+
             $grund = $this->HarterFilter($m, $k);
             if ($grund !== "") { $abgelehnt[$k["Key"]] = $grund; continue; }
 
@@ -810,6 +831,81 @@ class Meldungszentrale extends IPSModule {
         return true;
     }
 
+    /**
+     * Erinnert an eine offene Meldung: dieselbe Meldung, ein zweites Mal
+     * zugestellt. Es entsteht KEINE neue Meldung, kein neuer Eintrag in der
+     * Anzeige und kein neuer Flutschutz-Vorfall - nur die fluechtigen Kanaele
+     * laufen erneut.
+     *
+     * Die Filterkette gilt dabei unveraendert: Wer nachts nicht gestoert
+     * werden darf, wird auch von einer Erinnerung nicht gestoert.
+     *
+     * Wann erinnert wird, entscheidet die Quelle. Sie kennt Intervall,
+     * Obergrenze und ihre eigenen Bedingungen - etwa dass an die Waschmaschine
+     * nicht erinnert wird, solange der Trockner laeuft.
+     *
+     * @return string JSON mit ok, meldungID und der Zahl der Erinnerungen.
+     */
+    public function Erinnern(string $Quelle, string $Sache): string {
+        $quelle = trim($Quelle);
+        $sache  = trim($Sache);
+        $m = $this->MeldungPerSache($quelle, $sache);
+        if ($m === null) {
+            $this->SendDebug("Erinnern", "Keine offene Meldung fuer '$quelle/$sache'", 0);
+            return json_encode(["ok" => false, "fehlercode" => "keine_meldung"]);
+        }
+
+        $meldungID = $m["meldungID"];
+        $lock = $this->StoreLockName($meldungID);
+        if (!IPS_SemaphoreEnter($lock, self::LOCK_MS)) return json_encode(["ok" => false, "fehlercode" => "intern"]);
+        try {
+            $m = $this->MeldungLesen($meldungID);
+            if ($m === null) return json_encode(["ok" => false, "fehlercode" => "keine_meldung"]);
+            $m["erinnerungen"] = (int)($m["erinnerungen"] ?? 0) + 1;
+            $m["letzteErinnerung"] = time();
+            $m["revision"] = (int)($m["revision"] ?? 1) + 1;
+            $this->MeldungSchreiben($m);
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+
+        $this->JournalAnhaengen(["typ" => "erinnert", "meldungID" => $meldungID,
+                                 "quelle" => $quelle, "sache" => $sache,
+                                 "anzahl" => (int)$m["erinnerungen"]]);
+        $this->Routen($meldungID, true);
+        $this->AnzeigeAktualisieren();
+
+        return json_encode(["ok" => true, "meldungID" => $meldungID,
+                            "erinnerungen" => (int)$m["erinnerungen"]]);
+    }
+
+    /**
+     * Die Sache ist erledigt - alle offenen Meldungen der Quelle dazu werden
+     * zurueckgezogen. Ohne das bliebe "Waschmaschine ausraeumen" bis zum
+     * Ablauf der Gueltigkeit stehen, obwohl die Waesche laengst draussen ist.
+     *
+     * @return string JSON mit ok und der Zahl der zurueckgezogenen Meldungen.
+     */
+    public function Erledigt(string $Quelle, string $Sache): string {
+        $quelle = trim($Quelle);
+        $sache  = trim($Sache);
+        if ($sache === "") return json_encode(["ok" => false, "fehlercode" => "keine_sache"]);
+
+        $ids = [];
+        foreach ($this->OffeneMeldungen() as $m) {
+            if ($m["quelle"] === $quelle && ($m["sache"] ?? "") === $sache) $ids[] = $m["meldungID"];
+        }
+        $anzahl = 0;
+        foreach ($ids as $id) if ($this->Zurueckziehen($id)) $anzahl++;
+
+        if ($anzahl > 0) {
+            $this->JournalAnhaengen(["typ" => "erledigt", "quelle" => $quelle,
+                                     "sache" => $sache, "anzahl" => $anzahl]);
+        }
+        $this->SendDebug("Erledigt", "'$quelle/$sache': $anzahl Meldung(en) zurueckgezogen", 0);
+        return json_encode(["ok" => true, "zurueckgezogen" => $anzahl]);
+    }
+
     public function Journal(string $Filter): string {
         $zeilen = [];
         foreach ($this->JournalSegmente() as $datei) {
@@ -1126,6 +1222,22 @@ class Meldungszentrale extends IPSModule {
             }
         }
         return null;
+    }
+
+    /**
+     * Die offene Meldung einer Quelle zu einer Sache. Gibt es mehrere - etwa
+     * aus der Zeit vor diesem Feld -, gewinnt die juengste; die aelteren
+     * raeumt Erledigt() mit ab.
+     */
+    private function MeldungPerSache(string $quelle, string $sache): ?array {
+        if ($sache === "") return null;
+        $treffer = null;
+        foreach ($this->OffeneMeldungen() as $m) {
+            if ($m["quelle"] !== $quelle || ($m["sache"] ?? "") !== $sache) continue;
+            if (time() > $m["gueltigBis"]) continue;
+            if ($treffer === null || (int)$m["erstellt"] > (int)$treffer["erstellt"]) $treffer = $m;
+        }
+        return $treffer;
     }
 
     /**

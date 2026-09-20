@@ -227,6 +227,10 @@ class ToDoZentrale extends IPSModule {
         if (!isset($items[$Ident])) return false;
 
         $this->SendDebug("Clear", "Entferne '$Ident'", 0);
+        // Auch ohne Ansage muessen die Ziele erfahren, dass die Sache erledigt
+        // ist - sonst bleibt eine Meldung in der Zentrale stehen, obwohl die
+        // Aufgabe verschwunden ist.
+        $this->MeldeErledigt($items[$Ident]);
         unset($items[$Ident]);
         $this->PutItems($items);
         $this->Reconcile();
@@ -246,7 +250,9 @@ class ToDoZentrale extends IPSModule {
         $this->SendDebug("Acknowledge", "'$Ident' erledigt", 0);
 
         if ($item['speakOn'] & self::SPEAK_ERLEDIGT) {
-            $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item), false);
+            $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item), false, "erledigt");
+        } else {
+            $this->MeldeErledigt($item);
         }
 
         unset($items[$Ident]);
@@ -403,7 +409,9 @@ class ToDoZentrale extends IPSModule {
             if ($this->ConditionMet($item['clearVarID'], $item['clearMode'], $item['clearValue'])) {
                 $this->SendDebug("Cycle", "'$ident' automatisch erledigt (Bedingung erfuellt)", 0);
                 if ($item['speakOn'] & self::SPEAK_ERLEDIGT) {
-                    $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item), false);
+                    $this->SpeakItem($item, "Erledigt: " . $this->SpeechText($item), false, "erledigt");
+                } else {
+                    $this->MeldeErledigt($item);
                 }
                 unset($items[$ident]);
                 $changed = true;
@@ -464,7 +472,7 @@ class ToDoZentrale extends IPSModule {
         }
 
         foreach ($speakable as $item) {
-            $this->SpeakItem($item, $this->SpeechText($item));
+            $this->SpeakItem($item, $this->SpeechText($item), true, "erinnerung");
         }
     }
 
@@ -690,7 +698,36 @@ class ToDoZentrale extends IPSModule {
      *                       Abhaken - ein Ziel mit festen Ansagen wuerde sonst
      *                       beim Quittieren erneut "ist fertig" sagen.
      */
-    private function SpeakItem(array $item, string $text, bool $useEvent = true) {
+    /**
+     * Stabile Kennung der Sache fuer nachgelagerte Zentralen. Sie bleibt ueber
+     * Erstansage, Erinnerungen und Erledigung hinweg gleich - erst dadurch ist
+     * eine Erinnerung dort dieselbe Meldung und keine zweite.
+     */
+    private function SacheKey(array $item): string {
+        return "todo:" . $item['ident'];
+    }
+
+    /**
+     * Meldet den Zielen, dass die Sache erledigt ist, ohne etwas zu sprechen.
+     * Laeuft unabhaengig von speakOn: Das Abraeumen einer Meldung ist keine
+     * Ansage, sondern Buchhaltung.
+     */
+    private function MeldeErledigt(array $item) {
+        $targets = is_array($item['voiceTargets']) ? $item['voiceTargets'] : [];
+        foreach ($this->GetVoiceTargets() as $target) {
+            if (!$target['Enabled']) continue;
+            if (count($targets) > 0 && !in_array($target['Key'], $targets)) continue;
+            $scriptID = (int)$target['ScriptID'];
+            if ($scriptID <= 0 || !IPS_ScriptExists($scriptID)) continue;
+            @IPS_RunScriptEx($scriptID, ['Titel' => (string)$item['text'], 'Text' => "",
+                                         'Event' => (string)($item['speechEvent'] ?? ""),
+                                         'Prioritaet' => (int)$item['priority'],
+                                         'Anlass' => "erledigt", 'Sache' => $this->SacheKey($item)]);
+        }
+        $this->SendDebug("Erledigt", "Ziele abgemeldet: " . $this->SacheKey($item), 0);
+    }
+
+    private function SpeakItem(array $item, string $text, bool $useEvent = true, string $anlass = "neu") {
         if ($item['priority'] < $this->ReadPropertyInteger("VoiceMinPriority")) {
             $this->SendDebug("Sprache", "Unterdrueckt (Prioritaet zu niedrig): $text", 0);
             return;
@@ -700,7 +737,8 @@ class ToDoZentrale extends IPSModule {
         $event = ($useEvent && isset($item['speechEvent'])) ? (string)$item['speechEvent'] : "";
         // Der Aufgabentext dient als Titel - er ist kurz und benennt die Sache,
         // waehrend der gesprochene Text ein ganzer Satz sein darf.
-        $this->SpeakRaw($text, $targets, true, $item['text'], $event, (int)$item['priority']);
+        $this->SpeakRaw($text, $targets, true, $item['text'], $event, (int)$item['priority'],
+                        $anlass, $this->SacheKey($item));
     }
 
     /**
@@ -716,7 +754,7 @@ class ToDoZentrale extends IPSModule {
      *                             Ohne sie kam bei einer nachgelagerten Zentrale
      *                             jede Aufgabe gleich wichtig an.
      */
-    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "", string $event = "", int $priority = -1) {
+    private function SpeakRaw(string $text, array $targetKeys, bool $respectQuiet, string $title = "", string $event = "", int $priority = -1, string $anlass = "neu", string $sache = "") {
         $text = trim($text);
         if ($text === "") return;
 
@@ -754,7 +792,8 @@ class ToDoZentrale extends IPSModule {
                 // 'Event' und 'Prioritaet' kamen spaeter dazu - ein Skript, das
                 // sie nicht kennt, ignoriert sie folgenlos.
                 @IPS_RunScriptEx($scriptID, ['Titel' => $useTitle, 'Text' => $text, 'Event' => $event,
-                                             'Prioritaet' => $priority]);
+                                             'Prioritaet' => $priority, 'Anlass' => $anlass,
+                                             'Sache' => $sache]);
                 $delivered++;
             } elseif ($variableID > 0 && IPS_VariableExists($variableID)) {
                 @RequestAction($variableID, $text);

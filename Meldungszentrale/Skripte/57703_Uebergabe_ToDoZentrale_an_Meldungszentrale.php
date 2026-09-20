@@ -12,6 +12,20 @@
 
 $mz = 21816;
 
+// Anlass und Sache kommen aus der ToDo-Zentrale. Die Sache bleibt ueber
+// Erstansage, Erinnerungen und Erledigung hinweg dieselbe Kennung - nur
+// dadurch kann die Meldungszentrale erkennen, dass es um dieselbe Sache geht.
+$anlass = isset($_IPS['Anlass']) ? trim((string)$_IPS['Anlass']) : 'neu';
+$sache  = isset($_IPS['Sache'])  ? trim((string)$_IPS['Sache'])  : '';
+
+// Erledigt: Die offene Meldung wird zurueckgezogen, es entsteht keine neue.
+// Ohne das bliebe "Waschmaschine ausraeumen" bis zum Ablauf der Gueltigkeit
+// stehen, obwohl die Waesche laengst draussen ist.
+if ($anlass === 'erledigt') {
+    if ($sache !== '') MZ_Erledigt($mz, 'todozentrale', $sache);
+    return;
+}
+
 $event = isset($_IPS['Event']) ? trim($_IPS['Event']) : '';
 if ($event === '') {
     // Ohne Kennung kann Ultimate Voice nichts sagen - der Dienst kennt nur
@@ -26,6 +40,15 @@ if ($event === '') {
 // gefahrenberechtigte Quellen, die ToDo-Zentrale ist keine.
 $prio = (int)($_IPS['Prioritaet'] ?? -1);
 $dringlichkeit = [0 => 'info', 1 => 'normal', 2 => 'wichtig', 3 => 'wichtig'][$prio] ?? 'normal';
+
+// Erinnerung: dieselbe Meldung, ein zweites Mal zugestellt. Gibt es keine
+// offene Meldung mehr - abgelaufen, zurueckgezogen, Neustart -, faellt das
+// Skript auf eine regulaere Meldung zurueck.
+if ($anlass === 'erinnerung' && $sache !== '') {
+    $r = json_decode(MZ_Erinnern($mz, 'todozentrale', $sache), true);
+    if (is_array($r) && ($r['ok'] ?? false)) return;
+    IPS_LogMessage('MZ-Uebergabe', 'Keine offene Meldung zu ' . $sache . ', melde neu');
+}
 
 $ergebnis = MZ_Melden($mz, json_encode([
     'quelle'        => 'todozentrale',
@@ -46,6 +69,9 @@ $ergebnis = MZ_Melden($mz, json_encode([
     // Ansage. Mit Stundenschluessel galt sie innerhalb derselben Stunde als
     // Doppel und wurde verschluckt.
     'dedupKey'      => $event . '-' . date('Y-m-d-H-i'),
+    // Stabile Kennung der Sache - ueber sie findet die Zentrale die Meldung
+    // bei Erinnerungen und beim Erledigen wieder.
+    'sache'         => $sache,
 ], JSON_UNESCAPED_UNICODE));
 
 $d = json_decode($ergebnis, true);
