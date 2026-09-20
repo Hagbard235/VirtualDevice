@@ -828,6 +828,10 @@ class Meldungszentrale extends IPSModule {
         }
         $this->AktionZurueckziehen($MeldungID);
         $this->MeldungAbschliessen($MeldungID, "zurueckgezogen");
+        // Ohne das blieben Zaehler und Anzeige auf dem alten Stand, bis der
+        // naechste zyklische Lauf sie einholt - beim Erledigen einer Aufgabe
+        // ist das der Normalfall und faellt sofort auf.
+        $this->NachLaufAktualisieren();
         return true;
     }
 
