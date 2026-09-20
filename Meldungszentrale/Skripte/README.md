@@ -1,8 +1,13 @@
 # Skripte
 
 Sicherung der Symcon-Skripte, die zu den Modulen dieser Bibliothek gehören, aber
-selbst **keine Module** sind. Symcon lädt aus diesem Ordner nichts — er hat keine
-`module.json`.
+selbst **keine Module** sind. Symcon lädt aus diesem Ordner nichts.
+
+> **Warum dieser Ordner unterhalb der Meldungszentrale liegt:** Symcon prüft jeden
+> Ordner im Wurzelverzeichnis einer Bibliothek als Modul und lehnt das Update der
+> gesamten Bibliothek ab, wenn dort eine `module.json` fehlt — die Meldung lautet
+> „beinhaltet ungültiges Module …". Nicht-Modul-Ordner gehören deshalb unter ein
+> Modul, nicht in die Wurzel.
 
 **Maßgeblich ist das Skript in Symcon.** Dieser Ordner ist die versionierte
 Sicherung. Wer ein Skript in Symcon ändert, zieht die Datei hier nach.

@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - 'BewegungsmelderProxy/**'
-      - 'tests/BewegungsmelderProxyTest.php'
+      - 'BewegungsmelderProxy/tests/BewegungsmelderProxyTest.php'
       - '.github/workflows/motion-proxy-tests.yml'
   pull_request:
     paths:
       - 'BewegungsmelderProxy/**'
-      - 'tests/BewegungsmelderProxyTest.php'
+      - 'BewegungsmelderProxy/tests/BewegungsmelderProxyTest.php'
       - '.github/workflows/motion-proxy-tests.yml'
   workflow_dispatch:
 
@@ -24,4 +24,4 @@ jobs:
       - name: Lint module
         run: php -n -l BewegungsmelderProxy/module.php
       - name: Run regression tests
-        run: php -n tests/BewegungsmelderProxyTest.php
+        run: php -n BewegungsmelderProxy/tests/BewegungsmelderProxyTest.php
