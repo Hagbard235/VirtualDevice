@@ -19,8 +19,12 @@ class GeraetLauf extends IPSModule {
     const STATE_FERTIG = 2;
 
     // Vergleichsoperatoren der ToDo-Zentrale (dort gespiegelt).
-    const CMP_WAHR   = 4;
-    const CMP_FALSCH = 5;
+    const CMP_GLEICH   = 0;
+    const CMP_UNGLEICH = 1;
+    const CMP_GROESSER = 2;
+    const CMP_KLEINER  = 3;
+    const CMP_WAHR     = 4;
+    const CMP_FALSCH   = 5;
 
     // Quittierungsarten der ToDo-Zentrale.
     const ACK_MANUELL     = 0;
@@ -96,6 +100,15 @@ class GeraetLauf extends IPSModule {
         $this->RegisterPropertyInteger("RemindMinutes", 30);
         $this->RegisterPropertyInteger("RemindMax", 0);
         $this->RegisterPropertyInteger("SuppressVarID", 0);
+        // Vergleich fuer die Unterdrueckung. "wahr"/"falsch" brauchen keinen
+        // Wert, die uebrigen vergleichen mit SuppressValue. Damit laesst sich
+        // auch ein Zustand mit mehreren Stufen treffen - etwa "Trockner laeuft"
+        // (Zustand = 1), ohne "Trockner fertig" (Zustand = 2) mitzunehmen, was
+        // bei einer reinen Ja/Nein-Pruefung nicht ginge.
+        $this->RegisterPropertyString("SuppressCompare", "wahr");
+        $this->RegisterPropertyString("SuppressValue", "");
+        // Bleibt fuer Instanzen aus der Zeit vor SuppressCompare registriert
+        // und wirkt nur noch, wenn dort "wahr" steht (siehe SuppressMode).
         $this->RegisterPropertyBoolean("SuppressWhenTrue", true);
 
         // Technikhinweise - unplausible Zustaende dieses Geraets. Sie gehen
@@ -394,13 +407,32 @@ class GeraetLauf extends IPSModule {
         $suppressID = $this->ReadPropertyInteger("SuppressVarID");
         if ($suppressID > 0) {
             $options['stummVar'] = $suppressID;
-            $options['stummMode'] = $this->ReadPropertyBoolean("SuppressWhenTrue") ? self::CMP_WAHR : self::CMP_FALSCH;
+            $options['stummMode'] = $this->SuppressMode();
+            $options['stummWert'] = $this->ReadPropertyString("SuppressValue");
         }
 
         $angelegt = $this->SetToDo($this->IdentDone(), $this->TextDone(), $options);
         // Nur eine tatsaechlich angelegte Aufgabe kann spaeter abgehakt
         // werden - sonst saehe ein fehlgeschlagenes Anlegen wie Abhaken aus.
         $this->WriteAttributeBoolean("DoneToDoActive", $angelegt);
+    }
+
+    /**
+     * Uebersetzt die eingestellte Vergleichsart in den Operator der
+     * ToDo-Zentrale. Bei "wahr" gilt zusaetzlich der alte Schalter
+     * SuppressWhenTrue: So verhaelt sich eine Instanz, die vor dieser
+     * Erweiterung auf "unterdruecken wenn falsch" stand, unveraendert.
+     */
+    private function SuppressMode(): int {
+        switch (strtolower(trim($this->ReadPropertyString("SuppressCompare")))) {
+            case "falsch":   return self::CMP_FALSCH;
+            case "gleich":   return self::CMP_GLEICH;
+            case "ungleich": return self::CMP_UNGLEICH;
+            case "groesser": return self::CMP_GROESSER;
+            case "kleiner":  return self::CMP_KLEINER;
+            default:
+                return $this->ReadPropertyBoolean("SuppressWhenTrue") ? self::CMP_WAHR : self::CMP_FALSCH;
+        }
     }
 
     private function SetState(int $state, string $info) {

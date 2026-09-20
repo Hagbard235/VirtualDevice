@@ -249,13 +249,38 @@
           "width": "600px"
         },
         {
-          "type": "CheckBox",
-          "name": "SuppressWhenTrue",
-          "caption": "Unterdruecken, wenn die Variable True ist"
+          "type": "RowLayout",
+          "items": [
+            {
+              "type": "Select",
+              "name": "SuppressCompare",
+              "caption": "Vergleich",
+              "width": "220px",
+              "options": [
+                { "caption": "ist wahr", "value": "wahr" },
+                { "caption": "ist falsch", "value": "falsch" },
+                { "caption": "ist gleich", "value": "gleich" },
+                { "caption": "ist ungleich", "value": "ungleich" },
+                { "caption": "ist groesser als", "value": "groesser" },
+                { "caption": "ist kleiner als", "value": "kleiner" }
+              ]
+            },
+            {
+              "type": "ValidationTextBox",
+              "name": "SuppressValue",
+              "caption": "Vergleichswert",
+              "width": "200px"
+            }
+          ]
         },
         {
           "type": "Label",
           "caption": "Damit laesst sich ein zweites Geraet beruecksichtigen - etwa keine Erinnerung an die Waschmaschine, solange der Trockner laeuft. Die Aufgabe bleibt sichtbar, nur die Erinnerung schweigt."
+        },
+        {
+          "type": "Label",
+          "caption": "\"ist wahr\" und \"ist falsch\" brauchen keinen Wert. Fuer den Zustand eines anderen GeraeteLauf gilt: 0 = Bereit, 1 = Laeuft, 2 = Fertig. \"ist gleich 1\" trifft also nur den laufenden Trockner - sobald er fertig ist, erinnert die Waschmaschine wieder, denn ab da kann umgeladen werden. Eine reine Ja/Nein-Pruefung koennte das nicht: Dort waeren 1 und 2 beide wahr, und die Erinnerung bliebe auch bei einem fertigen, aber noch vollen Trockner stumm.",
+          "italic": true
         }
       ]
     },

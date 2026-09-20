@@ -79,7 +79,23 @@ ein — ein gesetzter Wert hat immer Vorrang vor der Ableitung.
 
 Über „Erinnerung unterdrücken, solange diese Variable gilt" lässt sich ein
 zweites Gerät berücksichtigen — etwa keine Erinnerung an die Waschmaschine,
-solange der Trockner läuft.
+solange der Trockner läuft. Die **erste** Ansage kommt immer; unterdrückt werden
+nur die Wiederholungen. Die Aufgabe bleibt dabei sichtbar.
+
+Der Vergleich kennt `ist wahr`, `ist falsch`, `ist gleich`, `ist ungleich`,
+`ist größer als` und `ist kleiner als`; die letzten vier brauchen einen
+Vergleichswert. Für den Zustand eines anderen GeräteLauf gilt `0 = Bereit`,
+`1 = Läuft`, `2 = Fertig`.
+
+**Beispiel Waschmaschine und Trockner:** Unterdrückungsvariable ist der Zustand
+des Trockners, Vergleich `ist gleich`, Wert `1`. Die Waschmaschine meldet sich
+also einmal wie immer, schweigt dann, solange der Trockner läuft, und erinnert
+wieder, sobald er durch ist — ab da kann umgeladen werden.
+
+Eine reine Ja/Nein-Prüfung würde hier nicht genügen: Sie träfe `1` und `2`
+gleichermaßen, sodass auch ein fertiger, aber noch nicht ausgeräumter Trockner
+die Erinnerung dauerhaft stummstellte. Räumt dann niemand aus, schweigt auch die
+Waschmaschine — und die nasse Wäsche bliebe unbemerkt liegen.
 
 ## Statusvariablen
 
