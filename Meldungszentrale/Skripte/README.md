@@ -12,7 +12,7 @@ selbst **keine Module** sind. Symcon lädt aus diesem Ordner nichts.
 **Maßgeblich ist das Skript in Symcon.** Dieser Ordner ist die versionierte
 Sicherung. Wer ein Skript in Symcon ändert, zieht die Datei hier nach.
 
-Stand: 20.09.2026
+Stand: 30.09.2026
 
 ## Übersicht
 
@@ -38,11 +38,30 @@ Adapter für alle Sprachkanäle (`sprache_*`). Mit Ereigniskennung spricht Ultim
 Voice (59348), ohne sprechen die Echos den Text über `ECHOREMOTE_TextToSpeech`.
 Welche Echos je Kanal, steht in Variablen unter dem Skript:
 
-| Ident | Typ | Wert |
-|---|---|---|
-| `Echos_sprache_wz` | String | `34274` |
-| `Echos_sprache_sz` | String | `57384` |
-| `Echos_sprache_fz` | String | `45302` |
+| Ident | Typ | Wert | Raum |
+|---|---|---|---|
+| `Echos_sprache_wz` | String | `34274` | Wohnzimmer, Echo Dot |
+| `Echos_sprache_sz` | String | `57384` | Schlafzimmer, Echo Pop |
+| `Echos_sprache_fz` | String | `45302` | Mädchenzimmer, Echo Show |
+| `Echos_sprache_buero` | String | `cast:25418` | Büro, Google Home Mini |
+
+**Geräteart als Präfix (seit 30.09.2026):** `echo:<ID>` für Amazon-Geräte,
+`cast:<ID>` für Google-Geräte über das Sidecar. Ein Eintrag ohne Präfix gilt als
+Echo, die bestehenden Kanäle bleiben dadurch unverändert gültig. Gemischte Räume
+sind möglich (`echo:34274, cast:53895`), mit einer Einschränkung: Die Cast-Ausgabe
+folgt der Echo-Ausgabe um ein bis zwei Sekunden versetzt, weil die Ansage erst
+erzeugt sein muss.
+
+**Wie Cast an die Ansage kommt:** Ultimate Voice erzeugt die MP3 auch dann, wenn
+die Echo-Liste leer ist — es spielt sie dann nur nirgends ab. Die Datei landet im
+`user`-Verzeichnis, das Symcon im Hausnetz ausliefert, und das Cast-Gerät holt sie
+sich selbst. Der Dateiname kommt aus dem Aufruf nicht zurück, deshalb nimmt der
+Adapter die jüngste `uv_*.mp3`. Das ist ein Behelf, bis das Modul die Adresse
+selbst liefert (Anforderung 24, `UVD_PrepareText`).
+
+**Freien Text kann Cast nicht** — es spielt nur Dateien ab. Ein reiner Cast-Kanal
+bekommt deshalb `Kann = ereignis` und wird von Textmeldungen gar nicht erst
+angesprochen.
 
 ## 25621 — Push-Kanal der Meldungszentrale
 
