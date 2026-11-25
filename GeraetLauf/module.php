@@ -12,7 +12,9 @@
  * durchgehend ueber beziehungsweise unter der Schwelle liegt, wird
  * umgeschaltet. Einweichpausen koennen so kein Programmende vortaeuschen.
  */
+require_once __DIR__ . '/SupplyGuard.php';
 class GeraetLauf extends IPSModule {
+    use ApplianceSupplyGuard;
 
     const STATE_BEREIT = 0;
     const STATE_LAEUFT = 1;
@@ -49,6 +51,7 @@ class GeraetLauf extends IPSModule {
 
     public function Create() {
         parent::Create();
+        $this->CreateSupplyGuard();
 
         // Bewusst kein freies Namensfeld allein: eine Auswahl bekannter
         // Geraetetypen plus optionaler Zusatzname verhindert, dass eine neue
@@ -66,6 +69,7 @@ class GeraetLauf extends IPSModule {
         $this->RegisterPropertyInteger("StartHoldSeconds", 60);
         $this->RegisterPropertyFloat("EndWatt", 3.0);
         $this->RegisterPropertyInteger("EndHoldSeconds", 600);
+        $this->RegisterPropertyInteger("DryingHoldSeconds", 0);
         $this->RegisterPropertyInteger("MinRunMinutes", 15);
         $this->RegisterPropertyFloat("MinPeakWatt", 500.0);
 
@@ -164,6 +168,12 @@ class GeraetLauf extends IPSModule {
 
     public function ApplyChanges() {
         parent::ApplyChanges();
+        if ($this->ReadPropertyInteger('DryingHoldSeconds') > 0) {
+            if (!IPS_VariableProfileExists('GLF.DishwasherPhase')) IPS_CreateVariableProfile('GLF.DishwasherPhase',1);
+            foreach ([0=>'Bereit',1=>'Spült',2=>'Fertig – ausräumen',3=>'Spülprogramm beendet – Trocknungsphase',4=>'Unklar – Messung unterbrochen'] as $v=>$label)
+                IPS_SetVariableProfileAssociation('GLF.DishwasherPhase',$v,$label,'',-1);
+            $this->RegisterVariableInteger('ProgramPhase','Programmphase','GLF.DishwasherPhase',5);
+        }
 
         foreach ($this->GetMessageList() as $senderID => $messages) {
             foreach ($messages as $message) {
@@ -178,6 +188,10 @@ class GeraetLauf extends IPSModule {
             $this->RegisterMessage($doorID, VM_UPDATE);
         }
 
+        foreach (['SocketStateID','OnlineID'] as $property) {
+            $source=$this->ReadPropertyInteger($property);
+            if ($source>0 && IPS_VariableExists($source)) $this->RegisterMessage($source,VM_UPDATE);
+        }
         $interval = $this->ReadPropertyInteger("CheckInterval");
         if ($interval < 10) $interval = 10;
         $this->SetTimerInterval("CycleTimer", $interval * 1000);
@@ -195,7 +209,7 @@ class GeraetLauf extends IPSModule {
     /**
      * Hauptschleife. Erkennung, Prognose und Aufgabenpflege.
      */
-    public function Cycle() {
+    private function CycleCore() {
         $powerID = $this->ReadPropertyInteger("PowerID");
         if ($powerID <= 0 || !IPS_VariableExists($powerID)) {
             $this->SetStatus(201);
@@ -218,11 +232,37 @@ class GeraetLauf extends IPSModule {
             case self::STATE_LAEUFT: $this->HandleLaeuft($power); break;
             case self::STATE_FERTIG: $this->HandleFertig($power, $doorOpen); break;
         }
+        $this->UpdateProgramPhase();
     }
 
     // ------------------------------------------------------------------
     // Zustaende
     // ------------------------------------------------------------------
+
+
+    private function UpdateProgramPhase(): void {
+        $hold=$this->ReadPropertyInteger('DryingHoldSeconds');
+        if ($hold<=0) return;
+        $state=(int)$this->GetValue('State');
+        $old=(int)$this->GetValue('ProgramPhase');
+        $phase=$state;
+        if ($state===self::STATE_LAEUFT) {
+            $plausible=$this->ElapsedMinutes()>=$this->ReadPropertyInteger('MinRunMinutes')
+                && $this->ReadAttributeFloat('PeakWatt')>=$this->ReadPropertyFloat('MinPeakWatt');
+            if ($plausible && ($this->HeldFor('BelowSince',$hold)
+                || ($old===3 && !$this->HeldFor('AboveSince',$this->ReadPropertyInteger('StartHoldSeconds'))))) $phase=3;
+        }
+        if ($phase===3) $this->SetValue('Info','Spülprogramm vermutlich beendet – Trocknungsphase (aus Verbrauch abgeleitet). Noch nicht zum Ausräumen freigegeben; Fertigmeldung weiterhin erst nach 45 Minuten unter 3 W.');
+        if ($old===$phase) return;
+        $this->SetValue('ProgramPhase',$phase);
+        if ($state===self::STATE_LAEUFT && $this->ReadPropertyBoolean('ShowRunningTile')) {
+            $this->SetToDo($this->IdentRunning(),$phase===3?'Geschirrspüler: Spülprogramm beendet – Trocknungsphase (vermutet)':$this->TextRunning(),[
+                'kategorie'=>$this->ReadPropertyString('Category'),'quittierung'=>self::ACK_INFO,
+                'prio'=>0,'farbe'=>'GELB','schalter'=>$phase===3?'...trocknet...':'...laeuft...',
+                'erinnerung'=>0,'sprechen'=>0
+            ]);
+        }
+    }
 
     private function HandleBereit(float $power) {
         $this->SetValue("RunMinutes", 0);
@@ -298,7 +338,7 @@ class GeraetLauf extends IPSModule {
         $this->SetValue("Info", sprintf(
             // Keine Aussage ueber die Tuer: Ihr Zustand beweist nichts, erst
             // das Oeffnen nach dem Ende zaehlt.
-            "%s ist fertig - Waesche wartet aufs Ausraeumen.",
+            "%s ist fertig - wartet aufs Ausraeumen.",
             $this->DeviceName()
         ));
     }

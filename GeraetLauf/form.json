@@ -10,11 +10,26 @@
       "caption": "Geraetetyp",
       "width": "300px",
       "options": [
-        { "caption": "Waschmaschine", "value": 0 },
-        { "caption": "Trockner", "value": 1 },
-        { "caption": "Geschirrspueler", "value": 2 },
-        { "caption": "Backofen", "value": 3 },
-        { "caption": "Andere", "value": 99 }
+        {
+          "caption": "Waschmaschine",
+          "value": 0
+        },
+        {
+          "caption": "Trockner",
+          "value": 1
+        },
+        {
+          "caption": "Geschirrspueler",
+          "value": 2
+        },
+        {
+          "caption": "Backofen",
+          "value": 3
+        },
+        {
+          "caption": "Andere",
+          "value": 99
+        }
       ]
     },
     {
@@ -44,6 +59,27 @@
           "type": "CheckBox",
           "name": "DoorOpenWhenFalse",
           "caption": "Tuer ist offen, wenn die Variable False ist (Zigbee-Kontakte melden meist True = geschlossen)"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "SocketStateID",
+          "caption": "Steckdose eingeschaltet (optional, Boolean)"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "OnlineID",
+          "caption": "Steckdose erreichbar (optional, Boolean)"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "PowerMaxAgeSeconds",
+          "caption": "Maximales Alter der Leistung (0 = bisheriges Verhalten)",
+          "suffix": " Sekunden",
+          "minimum": 0
+        },
+        {
+          "type": "Label",
+          "caption": "Bei Versorgungsausfall oder fehlenden Messungen wird kein Programmende gemeldet. Nach einer Unterbrechung muss erneut Laufleistung erkannt werden."
         }
       ]
     },
@@ -223,10 +259,22 @@
           "name": "DonePriority",
           "caption": "Prioritaet der Fertig-Aufgabe",
           "options": [
-            { "caption": "Niedrig", "value": 0 },
-            { "caption": "Normal", "value": 1 },
-            { "caption": "Wichtig", "value": 2 },
-            { "caption": "Kritisch", "value": 3 }
+            {
+              "caption": "Niedrig",
+              "value": 0
+            },
+            {
+              "caption": "Normal",
+              "value": 1
+            },
+            {
+              "caption": "Wichtig",
+              "value": 2
+            },
+            {
+              "caption": "Kritisch",
+              "value": 3
+            }
           ]
         },
         {
@@ -257,12 +305,30 @@
               "caption": "Vergleich",
               "width": "220px",
               "options": [
-                { "caption": "ist wahr", "value": "wahr" },
-                { "caption": "ist falsch", "value": "falsch" },
-                { "caption": "ist gleich", "value": "gleich" },
-                { "caption": "ist ungleich", "value": "ungleich" },
-                { "caption": "ist groesser als", "value": "groesser" },
-                { "caption": "ist kleiner als", "value": "kleiner" }
+                {
+                  "caption": "ist wahr",
+                  "value": "wahr"
+                },
+                {
+                  "caption": "ist falsch",
+                  "value": "falsch"
+                },
+                {
+                  "caption": "ist gleich",
+                  "value": "gleich"
+                },
+                {
+                  "caption": "ist ungleich",
+                  "value": "ungleich"
+                },
+                {
+                  "caption": "ist groesser als",
+                  "value": "groesser"
+                },
+                {
+                  "caption": "ist kleiner als",
+                  "value": "kleiner"
+                }
               ]
             },
             {
@@ -317,6 +383,11 @@
           "minimum": 10
         }
       ]
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "DryingHoldSeconds",
+      "caption": "Trocknungsphase nach Sekunden unter Endschwelle (0 = aus; nur Anzeige)"
     }
   ],
   "actions": [

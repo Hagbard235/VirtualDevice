@@ -62,6 +62,8 @@ class KuehlschrankPV extends IPSModule {
         $this->RegisterPropertyBoolean("InvertSwitch", false);
         $this->RegisterPropertyInteger("ConsumptionID", 0);
         $this->RegisterPropertyInteger("MeterID", 0);
+        $this->RegisterPropertyInteger("BatteryDischargeID", 0);
+        $this->RegisterPropertyInteger("EnergyMaxAgeSeconds", 90);
         $this->RegisterPropertyBoolean("MeterFeedInNegative", true);
         $this->RegisterPropertyBoolean("MeterIncludesFridge", true);
 
@@ -343,11 +345,23 @@ class KuehlschrankPV extends IPSModule {
         $this->LearnDrift($meas);
         $this->UpdateBufferEstimate($meas);
         $this->Decide($meas);
+        if ($this->ReadPropertyInteger("BatteryDischargeID") > 0) {
+            $note = $meas['energyValid'] ? sprintf(" Hausbatterie: %.0f W Entladung vom Ueberschuss abgezogen.", $meas['batteryDischarge']) : " Energiemessung fehlt/veraltet: keine optionale PV- oder Vorkuehlung; notwendige Kuehlung bleibt aktiv.";
+            $this->SetValue("Info", $this->GetValue("Info") . $note);
+        }
     }
 
     // ------------------------------------------------------------------
     // Entscheidungslogik
     // ------------------------------------------------------------------
+
+    private static function EnergyPolicy(float $available, float $need, int $threshold, int $hysteresis, bool $on, float $discharge, bool $valid, int $preCoolGrid): array {
+        return [
+            'surplus' => $valid && $available >= $need + $threshold - ($on ? $hysteresis : 0),
+            // Grid allowance must not implicitly permit spending the home battery.
+            'precool' => $valid && $discharge <= 0 && $available >= $need - $preCoolGrid
+        ];
+    }
 
     private function Decide(array $meas) {
         $need      = $this->GetFridgeDemand();
@@ -358,8 +372,14 @@ class KuehlschrankPV extends IPSModule {
         // Hysterese: laeuft der Kuehlschrank bereits, darf der Ueberschuss
         // etwas einbrechen, ohne dass sofort abgeschaltet wird.
         $limit = $need + $threshold - ($meas['powerOn'] ? $hyst : 0);
-        $surplusOK = $this->StabilizeSurplus($available >= $limit);
-        $this->SetValue("SurplusOK", $surplusOK);
+        $policy = self::EnergyPolicy($available, $need, $threshold, $hyst, $meas['powerOn'], $meas['batteryDischarge'], $meas['energyValid'], $this->ReadPropertyInteger("PreCoolMaxGridW"));
+        $surplusOK = $this->StabilizeSurplus($policy['surplus']);
+        if (!$meas['energyValid']) {
+            $surplusOK = false;
+            $this->WriteAttributeBoolean("SurplusState", false);
+            $this->WriteAttributeFloat("SurplusPendingSince", 0.0);
+        }
+        $this->SetValue("SurplusOK", $policy['surplus']);
 
         $tooWarm    = $this->AnyAtOrAbove($meas, 'max');
         $bufferFull = $this->AllAtOrBelow($meas, 'min');
@@ -367,7 +387,7 @@ class KuehlschrankPV extends IPSModule {
         $now = time();
         $pvEnd = $this->PredictPVEnd();
         $preCoolWindow = ($pvEnd - $now) <= ($this->ReadPropertyInteger("PreCoolMinutes") * 60);
-        $preCoolPower  = $available >= ($need - $this->ReadPropertyInteger("PreCoolMaxGridW"));
+        $preCoolPower = $policy['precool'];
 
         // Sicherheitsnetz gegen einen Sensor, der plausible aber eingefrorene
         // Werte liefert: dann bliebe der Kuehlschrank sonst unbegrenzt aus.
@@ -375,13 +395,22 @@ class KuehlschrankPV extends IPSModule {
         $offSeconds = $meas['powerOn'] ? 0 : (microtime(true) - $this->ReadAttributeFloat("LastSwitchTime"));
         $maxOffExceeded = ($maxOff > 0) && ($offSeconds > ($maxOff * 60));
 
+        if ($surplusOK && !$policy['surplus']) {
+            $remaining = max(0, (int)ceil($this->ReadPropertyInteger("SurplusStableSeconds") - (microtime(true) - $this->ReadAttributeFloat("SurplusPendingSince"))));
+            $this->Command(true, self::STATE_LOCKED, sprintf(
+                "Kein ausreichender PV-Ueberschuss: %.0f W verfuegbar, %.0f W zum Weiterlaufen erforderlich. Pruefzeit noch %d min %02d s; bis dahin bleibt die Stromzufuhr an. Danach wird Kuehlbedarf und Verdichterschutz geprueft.",
+                $available, $limit, intdiv($remaining, 60), $remaining % 60
+            ));
+            return;
+        }
+
         if ($surplusOK) {
             // Solange Ueberschuss da ist, bekommt der Kuehlschrank Strom. Wann
             // der Verdichter laeuft, entscheidet weiterhin sein eigener Thermostat.
             $this->WriteAttributeBoolean("GridCoolActive", false);
             $this->Command(true, self::STATE_PV_COOL, sprintf(
                 "PV-Kuehlung: %d W Ueberschuss verfuegbar (benoetigt %d W).%s",
-                round($available), round($need + $threshold),
+                round($available), round($limit),
                 $bufferFull ? " Puffer ist geladen." : " Puffer wird geladen."
             ));
             return;
@@ -475,6 +504,8 @@ class KuehlschrankPV extends IPSModule {
             'fridgeW'      => 0.0,
             'surplus'      => 0.0,
             'available'    => 0.0,
+            'batteryDischarge' => 0.0,
+            'energyValid' => true,
             'freezer'      => 0.0,
             'fridge'       => 0.0,
             'freezerValid' => false,
@@ -505,6 +536,22 @@ class KuehlschrankPV extends IPSModule {
             && $meas['powerOn']
             && $meas['fridgeW'] >= self::COMPRESSOR_ON_WATT) {
             $meas['available'] += $meas['fridgeW'];
+        }
+
+        // Optional storage coupling: discharge is positive W, never charging power.
+        $batteryID = $this->ReadPropertyInteger("BatteryDischargeID");
+        if ($batteryID > 0) {
+            $maxAge = max(10, $this->ReadPropertyInteger("EnergyMaxAgeSeconds"));
+            foreach ([$meterID, $batteryID] as $sourceID) {
+                if ($sourceID <= 0 || !IPS_VariableExists($sourceID)) { $meas['energyValid'] = false; continue; }
+                $meta = IPS_GetVariable($sourceID); $value = GetValue($sourceID);
+                if ($meta['VariableUpdated'] <= 0 || time() - $meta['VariableUpdated'] > $maxAge || !is_numeric($value) || !is_finite((float)$value)) $meas['energyValid'] = false;
+            }
+            if ($meas['energyValid']) {
+                $discharge = (float)GetValue($batteryID);
+                if ($discharge < 0 || $discharge > 100000) $meas['energyValid'] = false;
+                else { $meas['batteryDischarge'] = $discharge; $meas['surplus'] -= $discharge; $meas['available'] -= $discharge; }
+            }
         }
 
         $errors = [];

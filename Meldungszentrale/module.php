@@ -131,6 +131,33 @@ class Meldungszentrale extends IPSModule {
      * nackte Zeichenkette koennte Erfolg, Fehler und Warnung nicht
      * unterscheiden.
      */
+    /** Address all occupied configured rooms, respecting quiet time even with wake signals. */
+    public function MeldenInBelegtenRaeumen(string $Options): string {
+        $opt = json_decode($Options, true);
+        if (!is_array($opt)) return json_encode(['ok' => false, 'fehlercode' => 'schema']);
+        $zones = [];
+        $globalDnd = $this->SignalLesen($this->ReadPropertyInteger("GlobalDndVarID"), false) === true;
+        foreach ($this->ListeAus("Zonen") as $row) {
+            $z = $this->ZoneFinden((string)($row['Key'] ?? ''));
+            if ($z === null || !$z['Aktiv'] || $globalDnd) continue;
+            $presence = (int)$z['PraesenzVarID'];
+            if ($presence <= 0 || !IPS_VariableExists($presence)) continue;
+            if ($this->SignalLesen($presence, false) !== true) continue;
+            if ($this->SignalLesen((int)$z['DndVarID'], false) === true) continue;
+            $from = $z['RuheVon']; $to = $z['RuheBis'];
+            if ($from === '' || $to === '') {
+                $from = $this->ReadPropertyString('RuheVon');
+                $to = $this->ReadPropertyString('RuheBis');
+            }
+            if ($this->IstRuhezeit($from, $to)) continue;
+            $zones[] = $z['Key'];
+        }
+        $opt['zone'] = array_values(array_unique($zones));
+        $result = json_decode($this->Melden(json_encode($opt, JSON_UNESCAPED_UNICODE)), true);
+        $result['adressierteZonen'] = $opt['zone'];
+        return json_encode($result, JSON_UNESCAPED_UNICODE);
+    }
+
     public function Melden(string $Options): string {
         // Vollstaendig gekapselt: Ein unbehandelter Fehler darf nie dazu
         // fuehren, dass ein Alarm lautlos verschwindet.

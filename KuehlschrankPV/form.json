@@ -41,6 +41,23 @@
           "type": "CheckBox",
           "name": "MeterIncludesFridge",
           "caption": "Der Kuehlschrank wird vom Gesamtzaehler mit erfasst"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "BatteryDischargeID",
+          "caption": "Hausbatterie: Entladeleistung (W, positiv; optional)",
+          "width": "600px"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "EnergyMaxAgeSeconds",
+          "caption": "Maximales Alter von Netz- und Batteriemessung",
+          "suffix": "Sekunden",
+          "minimum": 10
+        },
+        {
+          "type": "Label",
+          "caption": "Batterieentladung wird vom PV-Angebot abgezogen. Vorkuehlung nutzt keine Batterieentladung. Bei fehlenden Energiedaten bleibt temperaturbedingte Kuehlung erhalten."
         }
       ]
     },
