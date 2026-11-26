@@ -72,6 +72,13 @@
         },
         {
           "type": "NumberSpinner",
+          "name": "OnlineGraceSeconds",
+          "caption": "Toleranz bei kurzzeitigem Offline-Status (0 = sofort pausieren)",
+          "suffix": " Sekunden",
+          "minimum": 0
+        },
+        {
+          "type": "NumberSpinner",
           "name": "PowerMaxAgeSeconds",
           "caption": "Maximales Alter der Leistung (0 = bisheriges Verhalten)",
           "suffix": " Sekunden",
